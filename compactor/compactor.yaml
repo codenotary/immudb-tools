@@ -1,0 +1,30 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  annotations: {}
+  labels: {}
+  name: compactor
+spec:
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 5
+  schedule: 15 * * * *
+  successfulJobsHistoryLimit: 3
+  suspend: false
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: compactor
+              env:
+              - name: IMMUDB_ADMIN_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    key: <immudb-admin-password>
+                    name: <immudb-credentials>
+              - name: IMMUADMIN_IMMUDB_ADDRESS
+                value: <immudb-service>
+              image: codenotary/immudb-compactor:latest
+              imagePullPolicy: IfNotPresent
+          restartPolicy: Never
+

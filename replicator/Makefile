@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-V_COMMIT ?= devbuild
+V_COMMIT ?= $(shell git rev-parse HEAD|head -c 7)
 V_BUILT_AT = $(shell date +%s)
 V_VERSION ?= devbuild
-BUILD_TAG ?= devbuild
 AES_KEY ?= nokey
 IMAGE_TAG ?= replicator
 PUSH_TAG ?= immudb-replicator
@@ -33,13 +32,13 @@ replicator: *.go
 .PHONY: push docker
 docker:
 	DOCKER_BUILDKIT=1 docker build . -t $(IMAGE_TAG) \
-	--label "com.codenotary.commit=$(BUILD_TAG)" \
+	--label "com.codenotary.commit=$(V_COMMIT)" \
 	--build-arg V_VERSION=$(V_VERSION) \
 	--build-arg V_COMMIT=$(V_COMMIT) \
 	--build-arg AES_KEY=$(AES_KEY) 
         
 push: docker
-	docker image tag $(IMAGE_TAG):latest $(REPO)/$(PUSH_TAG):$(BUILD_TAG)
+	docker image tag $(IMAGE_TAG):latest $(REPO)/$(PUSH_TAG):$(V_COMMIT)
 	docker image tag $(IMAGE_TAG):latest $(REPO)/$(PUSH_TAG):latest
-	docker image push $(REPO)/$(PUSH_TAG):$(BUILD_TAG)
+	docker image push $(REPO)/$(PUSH_TAG):$(V_COMMIT)
 	docker image push $(REPO)/$(PUSH_TAG):latest

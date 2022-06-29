@@ -58,7 +58,7 @@ func main() {
 	log.Printf("Running on database: %s, using batchnum: %d, batchsize: %d and workers: %d.\n",
 		config.DBName, config.BatchNum, config.BatchSize, config.Workers)
 	end := make(chan bool)
-	startRnd(64, 2*config.BatchNum*config.BatchSize*config.Workers)
+	startRnd(64)
 	for i := 0; i < config.Workers; i++ {
 		go func(c int) {
 			work(c + 1)
@@ -82,7 +82,6 @@ func work(tnum int) {
 		log.Fatalln("Failed to connect. Reason:", err)
 	}
 
-
 	login, err := client.Login(ctx, []byte(config.Username), []byte(config.Password))
 	if err != nil {
 		log.Fatalln("Failed to login. Reason:", err.Error())
@@ -95,7 +94,7 @@ func work(tnum int) {
 		log.Fatalln("Failed to use the database. Reason:", err)
 	}
 	ctx = metadata.NewOutgoingContext(ctx, metadata.Pairs("authorization", udr.GetToken()))
-	defer func() { log.Printf("Quitting %d",tnum); client.CloseSession(ctx) }()
+	defer func() { log.Printf("Quitting %d", tnum); client.CloseSession(ctx) }()
 
 	var counter uint64
 	starttime := time.Now()
@@ -153,15 +152,14 @@ func getRnd() []byte {
 	return ret
 }
 
-func startRnd(size, vals int) {
+func startRnd(size) {
 	rndChan = make(chan []byte, 65536)
 	cpu := runtime.NumCPU()
 	for j := 0; j < cpu; j++ {
 		go func() {
-			for i := 0; i < vals; i += cpu {
+			for {
 				randStringBytesMaskImprSrcUnsafe(size)
 			}
 		}()
 	}
 }
-

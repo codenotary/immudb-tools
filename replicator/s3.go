@@ -17,7 +17,7 @@ package main
 
 import (
 	"errors"
-	"github.com/vchain-us/codenotary-cloud/tools/replicator/s3up"
+	"github.com/codenotary/immudb-tools/replicator/s3up"
 	"io"
 	"log"
 	"regexp"

@@ -74,27 +74,28 @@ func work(tnum int) {
 	tokenfile := "token-" + string(getRnd()[:8])
 	log.Println("Tokenfile: ", tokenfile)
 	opts := immuclient.DefaultOptions().WithAddress(config.IpAddr).WithPort(config.Port).WithTokenFileName(tokenfile)
-
-	client, err := immuclient.NewImmuClient(opts)
+	client := immuclient.NewClient()
+	client.SetupDialOptions(opts)
+	ctx := context.Background()
+	err := client.OpenSession(ctx, []byte(config.Username), []byte(config.Password), config.DBName)
 	if err != nil {
 		log.Fatalln("Failed to connect. Reason:", err)
 	}
 
-	ctx := context.Background()
 
 	login, err := client.Login(ctx, []byte(config.Username), []byte(config.Password))
 	if err != nil {
 		log.Fatalln("Failed to login. Reason:", err.Error())
 	}
 	ctx = metadata.NewOutgoingContext(ctx, metadata.Pairs("authorization", login.GetToken()))
-	defer logout(ctx, client)
 
 	udr, err := client.UseDatabase(ctx, &schema.Database{DatabaseName: config.DBName})
 	if err != nil {
-		logout(ctx, client)
+		client.CloseSession(ctx)
 		log.Fatalln("Failed to use the database. Reason:", err)
 	}
 	ctx = metadata.NewOutgoingContext(ctx, metadata.Pairs("authorization", udr.GetToken()))
+	defer func() { log.Printf("Quitting %d",tnum); client.CloseSession(ctx) }()
 
 	var counter uint64
 	starttime := time.Now()
@@ -113,7 +114,6 @@ func work(tnum int) {
 
 		kvList := &schema.SetRequest{KVs: kvs}
 		if _, err = client.SetAll(ctx, kvList); err != nil {
-			logout(ctx, client)
 			log.Fatalln("Failed to submit the batch. Reason:", err)
 		} else {
 			counter += uint64(config.BatchSize)
@@ -165,6 +165,3 @@ func startRnd(size, vals int) {
 	}
 }
 
-func logout(ctx context.Context, client immuclient.ImmuClient) {
-	_ = client.Logout(ctx)
-}

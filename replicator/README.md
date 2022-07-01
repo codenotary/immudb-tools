@@ -68,3 +68,7 @@ For `file` backup type, you only need to specify the path of the desired resulti
 
 To perform a backup, for every database present on the replica, this tools unloads the database from immudb, so that all data is flushed to disk and no modification are incoming, saves the data files, and then load the database back again.
 This has the advantage of backing up data at max speed (it is a file copy) without having to worry about consistency.
+
+# Example
+
+Included is a docker-compose file that sets up a master instance, a replica and the replicator to coordinate new databases on the master.

@@ -73,6 +73,12 @@ This tool can perform a run and exit, or ou can also choose to have the tool per
 Finally, you can then select the compaction mode: by default, a full compaction is performed. You can enable flush (percentage) compaction by setting `-cleanup-percentage` **and** `-flush`.
 To simply set the online compaction, specify `-cleanup-percentage` and `-oneshot` but not `-flush`
 
+## Kubernetes example
+
+In kubernetes, you can configure a cronjob so that the compactor is periodically scheduled.
+In file `compactor.yaml` you find an example of such a configuration. You will have to configure
+a secret holding credentials for immudb, and put the reference to such secret in `compactor.yaml`, and configure the service name (or stateful set) for the compactor.
+
 
 ## AES encoding/decoding
 To help you keep credentials encrypted at rest, you can specify an AES key (in form of 32 hex digits) that encrypts immudb password. You can then provide at compile time this key and this tools will decrypt the password at runtime.

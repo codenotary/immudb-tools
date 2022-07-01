@@ -1,0 +1,38 @@
+version: '3.8'
+services:
+    immudb-master:
+        image: codenotary/immudb
+        volumes:
+          - immudb_master:/var/lib/immudb
+        environment:
+          - IMMUDB_ADMIN_PASSWORD=${INSTANCE_IMMUDB_PASSWORD}
+        networks:
+          - immudb-network
+    immudb-replica:
+        image: codenotary/immudb
+        volumes:
+          - immudb_replica:/var/lib/immudb
+        environment:
+          - IMMUDB_ADMIN_PASSWORD=${INSTANCE_IMMUDB_PASSWORD}
+        networks:
+          - immudb-network
+    replicator:
+        image: codenotary/immudb-replicator
+        environment:
+          - MASTER_ADDRESS=immudb-master
+          - MASTER_PASSWORD=${INSTANCE_IMMUDB_PASSWORD}
+          - REPLICA_ADDRESS=immudb-replica
+          - REPLICA_PASSWORD=${INSTANCE_IMMUDB_PASSWORD}
+        volumes:
+          - immudb_replica:/var/lib/immudb
+        networks:
+          - immudb-network
+        depends_on:
+          - immudb-master
+          - immudb-replica
+volumes:
+    immudb_master:
+    immudb_replica:
+    
+networks:
+    immudb-network:

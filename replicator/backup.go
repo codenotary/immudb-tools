@@ -125,7 +125,7 @@ func doBackup(req backupRequest) {
 	if cli == nil {
 		return
 	}
-	defer cli.Disconnect()
+	defer func() { _ = cli.Disconnect() }()
 	dbs := db_list(ctx, cli)
 	BackupInfo.set_n_db(len(dbs))
 	out, err := createBackupTarget(req)
@@ -149,7 +149,9 @@ func doBackup(req backupRequest) {
 			log.Printf("Error unloading database: %s", err.Error())
 			continue
 		}
-		backupPath(ctx, tw, path.Join(config.Datadir, db), config.Datadir, cpBuffer)
+		if err = backupPath(ctx, tw, path.Join(config.Datadir, db), config.Datadir, cpBuffer); err != nil {
+			log.Printf("Error backing up database: %s", err.Error())
+		}
 		_, err = cli.LoadDatabase(ctx, &schema.LoadDatabaseRequest{Database: db})
 		if err != nil {
 			log.Printf("Error loading database: %s", err.Error())

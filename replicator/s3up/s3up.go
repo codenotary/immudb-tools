@@ -39,7 +39,7 @@ const BUFFERSIZE = 5242880
 // set it to TRUE to enable sha256 part checksum (?? must be also enabled on s3??)
 var (
 	UseSHA256 = false
-	debug *log.Logger
+	debug     *log.Logger
 	Loglevel  = 0
 )
 
@@ -56,9 +56,9 @@ type multipartUpload struct {
 }
 
 type errorResp struct {
-	XMLName    xml.Name `xml:"Error"`
-	Code       string   `xml:"Code"`
-	Message    string   `xml:"Message"`
+	XMLName xml.Name `xml:"Error"`
+	Code    string   `xml:"Code"`
+	Message string   `xml:"Message"`
 }
 
 type S3Uploader struct {
@@ -68,13 +68,13 @@ type S3Uploader struct {
 	secret_key string
 	client     *http.Client
 	uploadId   string
-	etags      []string
-	buffer     []byte
-	nextPn     int
-	objKey     string
-	bucket     string
-	parts      multipartUpload
-	useSha256  bool
+	//etags      []string
+	buffer    []byte
+	nextPn    int
+	objKey    string
+	bucket    string
+	parts     multipartUpload
+	useSha256 bool
 }
 
 func (s *S3Uploader) SignedRequestV4(
@@ -218,7 +218,7 @@ func Open(key, bucket, region, access_key, secret_key string) (s3 *S3Uploader, e
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		debug.Printf("Unable to read response body", err.Error())
+		debug.Printf("Unable to read response body: %s", err.Error())
 		return nil, err
 	}
 	debug.Printf("Resp body: %s", body)
@@ -227,7 +227,7 @@ func Open(key, bucket, region, access_key, secret_key string) (s3 *S3Uploader, e
 		var errorResponse errorResp
 		errmsg := "?? [unable to parse response]"
 		err = xml.Unmarshal(body, &errorResponse)
-		if err==nil {
+		if err == nil {
 			errmsg = fmt.Sprintf("%s [%s]", errorResponse.Message, errorResponse.Code)
 		}
 		return nil, fmt.Errorf("Failed authentication: %s", errmsg)
@@ -253,7 +253,6 @@ func (s3 *S3Uploader) Write(p []byte) (int, error) {
 			return totw, err
 		}
 	}
-	return 0, nil
 }
 
 func (s3 *S3Uploader) Write1(p []byte) (n int, err error) {
@@ -347,7 +346,7 @@ func (s3 *S3Uploader) Close() (err error) {
 }
 
 func init() {
-	if Loglevel>0 {
+	if Loglevel > 0 {
 		debug = log.New(os.Stderr, "DEBUG: ", log.LstdFlags|log.Lshortfile)
 	} else {
 		debug = log.New(ioutil.Discard, "DEBUG: ", log.LstdFlags|log.Lshortfile)

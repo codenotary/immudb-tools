@@ -334,12 +334,12 @@ func analyze_db() {
 	if master_cli == nil {
 		return
 	}
-	defer master_cli.Disconnect()
+	defer func() { _ = master_cli.Disconnect() }()
 	replica_ctx, replica_cli := connect(config.ReplicaAddr, config.ReplicaPort, config.ReplicaUsername, config.ReplicaPassword)
 	if replica_cli == nil {
 		return
 	}
-	defer replica_cli.Disconnect()
+	defer func() { _ = replica_cli.Disconnect() }()
 
 	master_list := db_list(master_ctx, master_cli)
 	replica_list := db_list(replica_ctx, replica_cli)
@@ -348,11 +348,9 @@ func analyze_db() {
 		log.Printf("- %v", o)
 		switch o.op {
 		case OP_ADD:
-			config_replica(master_ctx, master_cli, replica_ctx, replica_cli, o.src_db, o.dst_db)
-			break
+			_ = config_replica(master_ctx, master_cli, replica_ctx, replica_cli, o.src_db, o.dst_db)
 		case OP_DEL:
 			log.Printf("Ignoring orphaned database %s", o.dst_db)
-			break
 		}
 	}
 }

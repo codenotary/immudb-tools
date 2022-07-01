@@ -184,13 +184,13 @@ func track_db_queue(dbname string, current_qsize uint32, tnow int64) error {
 func ping_db(client immuclient.ImmuClient, ctx context.Context, dbname string) error {
 	udr, err := client.UseDatabase(ctx, &schema.Database{DatabaseName: dbname})
 	if err != nil {
-		debug.Printf("Failed to use database %s. Reason: %s", dbname, err.Error)
+		debug.Printf("Failed to use database %s. Reason: %s", dbname, err.Error())
 		return err
 	}
 	ctx = metadata.NewOutgoingContext(ctx, metadata.Pairs("authorization", udr.GetToken()))
 	health, err := client.Health(ctx)
 	if err != nil {
-		debug.Printf("Failed to get database %s health. Reason: %s", err.Error)
+		debug.Printf("Failed to get database %s health. Reason: %s", dbname, err.Error())
 		return err
 	}
 	if health.PendingRequests == 0 {
@@ -198,7 +198,7 @@ func ping_db(client immuclient.ImmuClient, ctx context.Context, dbname string) e
 		reset_db_queue(dbname)
 		_, err = client.CurrentState(ctx)
 		if err != nil {
-			debug.Printf("Failed to get database %s state. Reason: %s", err.Error)
+			debug.Printf("Failed to get database %s state. Reason: %s", dbname, err.Error())
 			return err
 		}
 		debug.Printf("Database %s ok", dbname)
@@ -208,7 +208,7 @@ func ping_db(client immuclient.ImmuClient, ctx context.Context, dbname string) e
 	elapsed := tnow - health.LastRequestCompletedAt
 	debug.Printf("DB %s elapsed %d [last tx: %s]", dbname, elapsed, time.UnixMilli(health.LastRequestCompletedAt))
 	if elapsed > config.MaxReqWait {
-		return fmt.Errorf("Database unresponsive since %s", health.LastRequestCompletedAt)
+		return fmt.Errorf("Database unresponsive since %d", health.LastRequestCompletedAt)
 	}
 	if err = track_db_queue(dbname, health.PendingRequests, tnow); err != nil {
 		return err
@@ -267,7 +267,7 @@ func scan_all() bool {
 		log.Printf("Failed to connect. Reason: %s", err.Error())
 		return false
 	}
-	defer client.Disconnect()
+	defer func() { _ = client.Disconnect() }()
 	ctx := context.Background()
 	login, err := timed_login(client, ctx, []byte(config.Username), []byte(config.Password))
 	if err != nil {
@@ -275,7 +275,7 @@ func scan_all() bool {
 		return false
 	}
 	ctx = metadata.NewOutgoingContext(ctx, metadata.Pairs("authorization", login.GetToken()))
-	defer client.Logout(ctx)
+	defer func() { _ = client.Logout(ctx) }()
 	dbs, err := timed_database_list(client, ctx)
 	if err != nil {
 		log.Printf("Failed to get database list. Reason: %s", err.Error())
@@ -318,7 +318,7 @@ func main() {
 	http.HandleFunc("/livez", livez)
 	http.HandleFunc("/immustatus", get_status)
 	http.HandleFunc("/version", version)
-	go http.ListenAndServe(":8085", nil)
+	go log.Printf("%v", http.ListenAndServe(":8085", nil))
 	for {
 		debug.Printf("Scanning")
 		c := make(chan bool, 1)

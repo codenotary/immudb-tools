@@ -147,7 +147,7 @@ func compact(ctx context.Context, client immuclient.ImmuClient, dbname string) {
 		return
 	}
 	ctx = metadata.NewOutgoingContext(ctx, metadata.Pairs("authorization", udr.GetToken()))
-	client.CompactIndex(ctx, &emptypb.Empty{})
+	_ = client.CompactIndex(ctx, &emptypb.Empty{})
 }
 
 func flush(ctx context.Context, client immuclient.ImmuClient, dbname string) {
@@ -157,7 +157,7 @@ func flush(ctx context.Context, client immuclient.ImmuClient, dbname string) {
 		return
 	}
 	ctx = metadata.NewOutgoingContext(ctx, metadata.Pairs("authorization", udr.GetToken()))
-	client.FlushIndex(ctx, float32(config.CleanupPercentage), true)
+	_,_ = client.FlushIndex(ctx, float32(config.CleanupPercentage), true)
 }
 
 func setOnlineCompaction(ctx context.Context, client immuclient.ImmuClient, dbname string) {
@@ -239,8 +239,8 @@ func main() {
 				compact(ctx, client, db)
 			}
 		}
-		client.Logout(ctx)
-		client.Disconnect()
+		_ = client.Logout(ctx)
+		_ = client.Disconnect()
 		if config.Oneshot {
 			break
 		}

@@ -3,7 +3,7 @@
 ## Abstract
 
 This tool can be used to check immudb health.
-It periodically connects to all databases configured in immudb and fetch their status, and exposes a simple HTTP interface that reports the global health.
+It periodically connects to all databases configured in immudb and fetch their status, and exposes (on port 8085) a simple HTTP interface that reports the global health.
 
 ## Usage
 ```
@@ -49,7 +49,7 @@ General timeout for every gRPC call from immuguard to immudb: request must be se
 
 ## Endpoint
 
-This tool exposes three REST endpoints:
+This tool exposes on port 8085 three REST endpoints:
 - `/livez`
 - `/immustatus`
 - `/version`

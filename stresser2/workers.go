@@ -76,6 +76,7 @@ func (kt *keyTracker) getRKey() string {
 func genKeyTracker() *keyTracker {
 	return &keyTracker{
 		start: config.Seed,
+		max:   config.MaxSeed,
 		mx:    sync.RWMutex{},
 	}
 }
@@ -96,10 +97,12 @@ func readWorker(n int) {
 
 		if counter > 0 {
 			avgSpeed = float64(counter*1000) / float64(time.Since(t0).Milliseconds())
-			lastSpeed = float64(config.BatchSize*1000) / float64(deltat.Milliseconds())
-			estSpeed = 0.9*estSpeed + 0.1*lastSpeed
+			if (deltat.Milliseconds()>0) {
+				lastSpeed = float64(config.BatchSize*1000) / float64(deltat.Milliseconds())
+				estSpeed = 0.9*estSpeed + 0.1*lastSpeed
+			}
 		}
-		log.Printf("%s reading batch %04d. Speed: estimated %10.3f, instant %10.3f, average %10.3f (KV/sec)", jobid, i+1, avgSpeed, lastSpeed, estSpeed)
+		log.Printf("%s reading batch %04d. Speed: estimated %10.3f, instant %10.3f, average %10.3f (KV/sec)", jobid, i+1, estSpeed, lastSpeed, avgSpeed)
 
 		kList := make([][]byte, config.BatchSize)
 		for j := 0; j < config.BatchSize; j++ {
@@ -112,7 +115,7 @@ func readWorker(n int) {
 			counter += int64(config.BatchSize)
 		}
 	}
-	log.Printf("%s DONE: read %d entries in %s", jobid, counter, time.Since(t0))
+	log.Printf("%s DONE: read %d entries in %s, %f KV/s", jobid, counter, time.Since(t0), float64(counter)/float64(time.Since(t0).Seconds()))
 }
 
 func writeWorker(n int) {
@@ -130,10 +133,12 @@ func writeWorker(n int) {
 		t1 = time.Now()
 		if counter > 0 {
 			avgSpeed = float64(counter*1000) / float64(time.Since(t0).Milliseconds())
-			lastSpeed = float64(config.BatchSize*1000) / float64(deltat.Milliseconds())
-			estSpeed = 0.9*estSpeed + 0.1*lastSpeed
+			if (deltat.Milliseconds()>0) {
+				lastSpeed = float64(config.BatchSize*1000) / float64(deltat.Milliseconds())
+				estSpeed = 0.9*estSpeed + 0.1*lastSpeed
+			}
 		}
-		log.Printf("%s writing batch %04d. Speed: estimated %10.3f, instant %10.3f, average %10.3f (KV/sec)", jobid, i+1, avgSpeed, lastSpeed, estSpeed)
+		log.Printf("%s writing batch %04d. Speed: estimated %10.3f, instant %10.3f, average %10.3f (KV/sec)", jobid, i+1, estSpeed, lastSpeed, avgSpeed)
 
 		kvs := make([]*schema.KeyValue, config.BatchSize)
 
@@ -158,6 +163,6 @@ func writeWorker(n int) {
 		}
 
 	}
-	log.Printf("%s DONE: inserted %d entries in %s", jobid, counter, time.Since(t0))
+	log.Printf("%s DONE: inserted %d entries in %s, %f KV/s", jobid, counter, time.Since(t0), float64(counter)/float64(time.Since(t0).Seconds()))
 
 }

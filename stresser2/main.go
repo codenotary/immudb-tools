@@ -25,6 +25,7 @@ import (
 
 var config struct {
 	Seed      int
+	MaxSeed   int
 	IpAddr    string
 	Port      int
 	Username  string
@@ -50,7 +51,8 @@ func init() {
 	flag.IntVar(&config.RWorkers, "read-workers", 1, "Number of concurrent read processes")
 	flag.IntVar(&config.WWorkers, "write-workers", 1, "Number of concurrent insertion processes")
 	flag.IntVar(&config.WSpeed, "write-speed", 500, "Target write speed (KV writes per second). 0 to disable throttling")
-	flag.IntVar(&config.Seed, "seed", -1, "Key seed (use -1 to use time-based seed)")
+	flag.IntVar(&config.Seed, "seed", 0, "Key seed start")
+	flag.IntVar(&config.MaxSeed, "max-seed", 0, "Key seed max")
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
 }

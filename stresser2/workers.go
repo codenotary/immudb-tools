@@ -30,9 +30,9 @@ import (
 func connect(jobid string) (context.Context, immuclient.ImmuClient) {
 	tokenfile := "token-" + string(getRnd()[:8])
 	log.Printf("Job %s Tokenfile: %s", jobid, tokenfile)
+	log.Printf("Addr: %s", config.IpAddr)
 	opts := immuclient.DefaultOptions().WithAddress(config.IpAddr).WithPort(config.Port).WithTokenFileName(tokenfile)
-	client := immuclient.NewClient()
-	client.SetupDialOptions(opts)
+	client := immuclient.NewClient().WithOptions(opts)
 	ctx := context.Background()
 	err := client.OpenSession(ctx, []byte(config.Username), []byte(config.Password), config.DBName)
 	if err != nil {

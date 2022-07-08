@@ -56,7 +56,7 @@ func init() {
 }
 
 func main() {
-	log.Printf("Running on database: %s, using batchnum: %d/d, batchsize: %d and workers: %d/%d.\n",
+	log.Printf("Running on database: %s, using batchnum: %d/%d, batchsize: %d and workers: %d/%d.\n",
 		config.DBName, config.RBatchNum, config.WBatchNum, config.BatchSize, config.RWorkers, config.WWorkers)
 	end := make(chan bool)
 	startRnd(64)

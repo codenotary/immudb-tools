@@ -150,10 +150,12 @@ func writeWorker(n int) {
 		} else {
 			counter += int64(config.BatchSize)
 		}
-		dt := time.Since(t1)
-		sleepTime := (1000.0 * float64(config.BatchSize) / float64(config.WSpeed)) - float64(dt.Milliseconds())
-		// log.Printf("Need to sleep %f ms", sleepTime)
-		time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+		if config.WSpeed>0 {
+			dt := time.Since(t1)
+			sleepTime := (1000.0 * float64(config.BatchSize) / float64(config.WSpeed)) - float64(dt.Milliseconds())
+			// log.Printf("Need to sleep %f ms", sleepTime)
+			time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+		}
 
 	}
 	log.Printf("%s DONE: inserted %d entries in %s", jobid, counter, time.Since(t0))

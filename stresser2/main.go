@@ -49,7 +49,7 @@ func init() {
 	flag.IntVar(&config.BatchSize, "batchsize", 1000, "Batch size")
 	flag.IntVar(&config.RWorkers, "read-workers", 1, "Number of concurrent read processes")
 	flag.IntVar(&config.WWorkers, "write-workers", 1, "Number of concurrent insertion processes")
-	flag.IntVar(&config.WSpeed, "write-speed", 500, "Target write speed (KV writes per second)")
+	flag.IntVar(&config.WSpeed, "write-speed", 500, "Target write speed (KV writes per second). 0 to disable throttling")
 	flag.IntVar(&config.Seed, "seed", -1, "Key seed (use -1 to use time-based seed)")
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())

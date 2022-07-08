@@ -57,7 +57,7 @@ func getRnd() []byte {
 }
 
 func getPayload(size int) []byte {
-	b := make([]byte, size)
+	b := make([]byte, 0, size)
 	for len(b) < size {
 		b = append(b, <-rndChan...)
 	}

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -99,7 +100,8 @@ func readWorker(n int, totalCounter *int64) {
 			kList[j] = h256(KeyTracker.getRKey())
 		}
 
-		if _, err := client.GetAll(ctx, kList); err != nil {
+		_, err := client.GetAll(ctx, kList)
+		if err != nil && !strings.Contains(err.Error(), "key not found") {
 			log.Fatalln("Failed to read the batch. Reason:", err)
 		} else {
 			counter += int64(config.BatchSize)

@@ -95,12 +95,17 @@ func readWorker(n int, totalCounter *int64) {
 	var counter int64
 	t0 := time.Now()
 	for i := 0; i < config.RBatchNum; i++ {
-		kList := make([][]byte, config.BatchSize)
-		for j := 0; j < config.BatchSize; j++ {
-			kList[j] = h256(KeyTracker.getRKey())
+		var err error
+		if config.BatchSize == 1 {
+			_, err = client.Get(ctx, h256(KeyTracker.getRKey()))
+		} else {
+			kList := make([][]byte, config.BatchSize)
+			for j := 0; j < config.BatchSize; j++ {
+				kList[j] = h256(KeyTracker.getRKey())
+			}
+			_, err = client.GetAll(ctx, kList)
 		}
 
-		_, err := client.GetAll(ctx, kList)
 		if err != nil && !strings.Contains(err.Error(), "key not found") {
 			log.Fatalln("Failed to read the batch. Reason:", err)
 		} else {

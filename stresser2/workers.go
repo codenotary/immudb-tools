@@ -19,12 +19,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"github.com/codenotary/immudb/pkg/api/schema"
-	immuclient "github.com/codenotary/immudb/pkg/client"
 	"log"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	"github.com/codenotary/immudb/pkg/api/schema"
+	immuclient "github.com/codenotary/immudb/pkg/client"
 )
 
 func connect(jobid string) (context.Context, immuclient.ImmuClient) {
@@ -69,7 +71,10 @@ func (kt *keyTracker) getWKey() string {
 func (kt *keyTracker) getRKey() string {
 	kt.mx.RLock()
 	defer kt.mx.RUnlock()
-	k := rand.Intn(kt.max-kt.start) + kt.start
+	var k = kt.start
+	if kt.max-kt.start > 0 {
+		k += rand.Intn(kt.max - kt.start)
+	}
 	return fmt.Sprintf("KEY:%10d", k)
 }
 
@@ -81,29 +86,14 @@ func genKeyTracker() *keyTracker {
 	}
 }
 
-func readWorker(n int) {
+func readWorker(n int, totalCounter *int64) {
 	jobid := fmt.Sprintf("RJOB%02d", n)
 
 	ctx, client := connect(jobid)
 	defer client.CloseSession(ctx)
 	var counter int64
-	var estSpeed float64
 	t0 := time.Now()
-	t1 := time.Now()
 	for i := 0; i < config.RBatchNum; i++ {
-		var avgSpeed, lastSpeed float64
-		deltat := time.Since(t1)
-		t1 = time.Now()
-
-		if counter > 0 {
-			avgSpeed = float64(counter*1000) / float64(time.Since(t0).Milliseconds())
-			if (deltat.Milliseconds()>0) {
-				lastSpeed = float64(config.BatchSize*1000) / float64(deltat.Milliseconds())
-				estSpeed = 0.9*estSpeed + 0.1*lastSpeed
-			}
-		}
-		log.Printf("%s reading batch %04d. Speed: estimated %10.3f, instant %10.3f, average %10.3f (KV/sec)", jobid, i+1, estSpeed, lastSpeed, avgSpeed)
-
 		kList := make([][]byte, config.BatchSize)
 		for j := 0; j < config.BatchSize; j++ {
 			kList[j] = h256(KeyTracker.getRKey())
@@ -113,32 +103,22 @@ func readWorker(n int) {
 			log.Fatalln("Failed to read the batch. Reason:", err)
 		} else {
 			counter += int64(config.BatchSize)
+			atomic.AddInt64(totalCounter, int64(config.BatchSize))
 		}
 	}
 	log.Printf("%s DONE: read %d entries in %s, %f KV/s", jobid, counter, time.Since(t0), float64(counter)/float64(time.Since(t0).Seconds()))
 }
 
-func writeWorker(n int) {
+func writeWorker(n int, totalCounter *int64) {
 	jobid := fmt.Sprintf("WJOB%02d", n)
 
 	ctx, client := connect(jobid)
 	defer client.CloseSession(ctx)
 	var counter int64
-	var estSpeed float64
 	t0 := time.Now()
 	t1 := time.Now()
 	for i := 0; i < config.WBatchNum; i++ {
-		var avgSpeed, lastSpeed float64
-		deltat := time.Since(t1)
 		t1 = time.Now()
-		if counter > 0 {
-			avgSpeed = float64(counter*1000) / float64(time.Since(t0).Milliseconds())
-			if (deltat.Milliseconds()>0) {
-				lastSpeed = float64(config.BatchSize*1000) / float64(deltat.Milliseconds())
-				estSpeed = 0.9*estSpeed + 0.1*lastSpeed
-			}
-		}
-		log.Printf("%s writing batch %04d. Speed: estimated %10.3f, instant %10.3f, average %10.3f (KV/sec)", jobid, i+1, estSpeed, lastSpeed, avgSpeed)
 
 		kvs := make([]*schema.KeyValue, config.BatchSize)
 
@@ -154,15 +134,14 @@ func writeWorker(n int) {
 			log.Fatalln("Failed to submit the batch. Reason:", err)
 		} else {
 			counter += int64(config.BatchSize)
+			atomic.AddInt64(totalCounter, int64(config.BatchSize))
 		}
-		if config.WSpeed>0 {
+		if config.WSpeed > 0 {
 			dt := time.Since(t1)
 			sleepTime := (1000.0 * float64(config.BatchSize) / float64(config.WSpeed)) - float64(dt.Milliseconds())
-			// log.Printf("Need to sleep %f ms", sleepTime)
 			time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 		}
 
 	}
 	log.Printf("%s DONE: inserted %d entries in %s, %f KV/s", jobid, counter, time.Since(t0), float64(counter)/float64(time.Since(t0).Seconds()))
-
 }

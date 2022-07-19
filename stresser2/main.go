@@ -20,6 +20,7 @@ import (
 	"flag"
 	"log"
 	"math/rand"
+	"sync/atomic"
 	"time"
 )
 
@@ -62,19 +63,93 @@ func main() {
 		config.DBName, config.RBatchNum, config.WBatchNum, config.BatchSize, config.RWorkers, config.WWorkers)
 	end := make(chan bool)
 	startRnd(64)
-	for i := 0; i < config.RWorkers; i++ {
-		go func(c int) {
-			readWorker(c + 1)
-			end <- true
-		}(i)
-	}
+
+	var totalReads, totalWrites int64
+
+	done := make(chan bool)
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+
+		var estSpeedR float64
+		var estSpeedW float64
+
+		var lastCounterR, lastCounterW int64
+
+		t0 := time.Now()
+		t1 := t0
+
+		for {
+			select {
+			case <-done:
+				end <- true
+				counterR := atomic.LoadInt64(&totalReads)
+				counterW := atomic.LoadInt64(&totalWrites)
+				t1 = time.Now()
+				log.Printf("DONE in %s: read %d entries, %f KV/s, wrote %d entries, %f KV/s",
+					time.Since(t0),
+					counterR,
+					float64(counterR)/float64(t1.Sub(t0).Seconds()),
+					counterW,
+					float64(counterW)/float64(t1.Sub(t0).Seconds()),
+				)
+				return
+
+			case <-ticker.C:
+				var avgSpeedR, lastSpeedR float64
+				var avgSpeedW, lastSpeedW float64
+				deltat := time.Since(t1)
+				t1 = time.Now()
+
+				counterR := atomic.LoadInt64(&totalReads)
+				counterW := atomic.LoadInt64(&totalWrites)
+
+				if counterR > 0 {
+					avgSpeedR = float64(counterR) / t1.Sub(t0).Seconds()
+					if deltat.Milliseconds() > 0 {
+						lastSpeedR = float64(counterR-lastCounterR) / deltat.Seconds()
+						estSpeedR = 0.9*estSpeedR + 0.1*lastSpeedR
+					}
+					lastCounterR = counterR
+				}
+				if counterW > 0 {
+					avgSpeedW = float64(counterW) / t1.Sub(t0).Seconds()
+					if deltat.Milliseconds() > 0 {
+						lastSpeedW = float64(counterW-lastCounterW) / deltat.Seconds()
+						estSpeedW = 0.9*estSpeedW + 0.1*lastSpeedW
+					}
+					lastCounterW = counterW
+				}
+				log.Printf(
+					"Read Speed: estimated %10.3f, instant %10.3f, average %10.3f (KV/sec), "+
+						"Write Speed: estimated %10.3f, instant %10.3f, average %10.3f (KV/sec)",
+					estSpeedR, lastSpeedR, avgSpeedR,
+					estSpeedW, lastSpeedW, avgSpeedW,
+				)
+			}
+		}
+
+	}()
+
 	for i := 0; i < config.WWorkers; i++ {
 		go func(c int) {
-			writeWorker(c + 1)
+			writeWorker(c+1, &totalWrites)
 			end <- true
 		}(i)
 	}
+
+	// A tiny delay to ensure some entries are already written
+	time.Sleep(time.Millisecond * 10)
+	for i := 0; i < config.RWorkers; i++ {
+		go func(c int) {
+			readWorker(c+1, &totalReads)
+			end <- true
+		}(i)
+	}
+
 	for i := 0; i < config.RWorkers+config.WWorkers; i++ {
 		<-end
 	}
+	close(done)
+	<-end
 }

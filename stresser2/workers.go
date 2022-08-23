@@ -87,12 +87,11 @@ func genKeyTracker() *keyTracker {
 	}
 }
 
-func readWorker(n int, totalCounter *int64) {
+func readWorker(n int, totalCounter *int64) (counter int64, elapsed float64) {
 	jobid := fmt.Sprintf("RJOB%02d", n)
 
 	ctx, client := connect(jobid)
 	defer client.CloseSession(ctx)
-	var counter int64
 	t0 := time.Now()
 	for i := 0; i < config.RBatchNum; i++ {
 		var err error
@@ -113,15 +112,16 @@ func readWorker(n int, totalCounter *int64) {
 			atomic.AddInt64(totalCounter, int64(config.BatchSize))
 		}
 	}
-	log.Printf("%s DONE: read %d entries in %s, %f KV/s", jobid, counter, time.Since(t0), float64(counter)/float64(time.Since(t0).Seconds()))
+	elapsed=float64(time.Since(t0).Seconds())
+	log.Printf("%s DONE: read %d entries in %.3fs, %.3f KV/s", jobid, counter, elapsed, float64(counter)/float64(time.Since(t0).Seconds()))
+	return counter, elapsed
 }
 
-func writeWorker(n int, totalCounter *int64) {
+func writeWorker(n int, totalCounter *int64) (counter int64, elapsed float64) {
 	jobid := fmt.Sprintf("WJOB%02d", n)
 
 	ctx, client := connect(jobid)
 	defer client.CloseSession(ctx)
-	var counter int64
 	t0 := time.Now()
 	t1 := time.Now()
 	for i := 0; i < config.WBatchNum; i++ {
@@ -136,7 +136,7 @@ func writeWorker(n int, totalCounter *int64) {
 			}
 		}
 
-		kvList := &schema.SetRequest{KVs: kvs}
+		kvList := &schema.SetRequest{KVs: kvs, NoWait: true}
 		if _, err := client.SetAll(ctx, kvList); err != nil {
 			log.Fatalln("Failed to submit the batch. Reason:", err)
 		} else {
@@ -150,5 +150,7 @@ func writeWorker(n int, totalCounter *int64) {
 		}
 
 	}
-	log.Printf("%s DONE: inserted %d entries in %s, %f KV/s", jobid, counter, time.Since(t0), float64(counter)/float64(time.Since(t0).Seconds()))
+	elapsed=float64(time.Since(t0).Seconds())
+	log.Printf("%s DONE: inserted %d entries in %.3fs, %.3f KV/s", jobid, counter, elapsed, float64(counter)/float64(time.Since(t0).Seconds()))
+	return counter, elapsed
 }

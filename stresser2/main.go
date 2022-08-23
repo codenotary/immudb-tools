@@ -63,7 +63,6 @@ func main() {
 		config.DBName, config.RBatchNum, config.WBatchNum, config.BatchSize, config.RWorkers, config.WWorkers)
 	end := make(chan bool)
 	startRnd(64)
-
 	var totalReads, totalWrites int64
 
 	done := make(chan bool)
@@ -130,10 +129,14 @@ func main() {
 		}
 
 	}()
+	var total_read_count, total_write_count int64
+	var total_read_time, total_write_time float64
 
 	for i := 0; i < config.WWorkers; i++ {
 		go func(c int) {
-			writeWorker(c+1, &totalWrites)
+			n,t := writeWorker(c+1, &totalWrites)
+			total_write_count += n
+			total_write_time += t
 			end <- true
 		}(i)
 	}
@@ -142,7 +145,9 @@ func main() {
 	time.Sleep(time.Millisecond * 10)
 	for i := 0; i < config.RWorkers; i++ {
 		go func(c int) {
-			readWorker(c+1, &totalReads)
+			n,t := readWorker(c+1, &totalReads)
+			total_read_count += n
+			total_read_time += t
 			end <- true
 		}(i)
 	}
@@ -152,4 +157,16 @@ func main() {
 	}
 	close(done)
 	<-end
+	if config.RWorkers>0 && total_read_time!=0 {
+		var r_speed float64
+		r_speed=float64(total_read_count)/float64(total_read_time)
+ 		r_speed=r_speed*float64(config.RWorkers)
+		log.Printf("TOTAL READ: %d KV, speed %f KV/s", total_read_count, r_speed)
+	}
+	if config.WWorkers>0 && total_write_time!=0 {
+		var w_speed float64
+		w_speed=float64(total_write_count)/float64(total_write_time)
+ 		w_speed=w_speed*float64(config.WWorkers)
+		log.Printf("TOTAL WRITE: %d KV, speed %f KV/s", total_write_count, w_speed)
+	}
 }

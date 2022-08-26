@@ -123,7 +123,7 @@ func readWorker(n int, totalCounter *int64) (counter int64, elapsed time.Duratio
 
 	elapsed = time.Since(t0)
 
-	log.Printf("%s DONE: read %d entries in %v, %.3f KV/s", jobid, counter, elapsed, float64(counter)/float64(elapsed.Seconds()))
+	log.Printf("%s DONE: read %d entries in %v, %.3f KV/s", jobid, counter, elapsed, float64(counter)/elapsed.Seconds())
 
 	return counter, elapsed
 }
@@ -134,13 +134,13 @@ func writeWorker(n int, totalCounter *int64) (counter int64, elapsed time.Durati
 	ctx, client := connect(jobid)
 	defer client.CloseSession(ctx)
 
-	t0 := time.Now()
-
 	var t1 time.Time
 
 	kvList := &schema.SetRequest{KVs: make([]*schema.KeyValue, config.WBatchSize), NoWait: true}
 
 	v := make([]byte, 256)
+
+	t0 := time.Now()
 
 	for i := 0; i < config.WBatchNum; i++ {
 		t1 = time.Now()
@@ -181,7 +181,7 @@ func writeWorker(n int, totalCounter *int64) (counter int64, elapsed time.Durati
 
 	elapsed = time.Since(t0)
 
-	log.Printf("%s DONE: inserted %d entries in %v, %.3f KV/s", jobid, counter, elapsed, float64(counter)/float64(elapsed.Seconds()))
+	log.Printf("%s DONE: inserted %d entries in %v, %.3f KV/s", jobid, counter, elapsed, float64(counter)/elapsed.Seconds())
 
 	return counter, elapsed
 }

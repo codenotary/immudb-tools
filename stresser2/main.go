@@ -141,16 +141,18 @@ func main() {
 
 	}()
 
+	t0 := time.Now()
+
 	var total_read_count, total_write_count int64
 	var total_read_time, total_write_time time.Duration
 	var totalReadMux, totalWriteMux sync.Mutex
 
 	for i := 0; i < config.WWorkers; i++ {
 		go func(c int) {
-			n, t := writeWorker(c+1, &totalWrites)
+			n, _ := writeWorker(c+1, &totalWrites)
 			totalWriteMux.Lock()
 			total_write_count += n
-			total_write_time += t
+			total_read_time = time.Since(t0)
 			totalWriteMux.Unlock()
 			end <- true
 		}(i)
@@ -160,11 +162,11 @@ func main() {
 	time.Sleep(time.Millisecond * 10)
 	for i := 0; i < config.RWorkers; i++ {
 		go func(c int) {
-			n, t := readWorker(c+1, &totalReads)
+			n, _ := readWorker(c+1, &totalReads)
 
 			totalReadMux.Lock()
 			total_read_count += n
-			total_read_time += t
+			total_write_time = time.Since(t0)
 			totalReadMux.Unlock()
 
 			end <- true
@@ -179,8 +181,8 @@ func main() {
 
 	<-end
 
-	if config.RWorkers > 0 && total_read_time != 0 {
-		r_speed := float64(config.RBatchNum*config.RWorkers) / float64(total_read_time.Seconds())
+	if config.RWorkers > 0 {
+		r_speed := float64(config.RBatchNum*config.RWorkers) / total_read_time.Seconds()
 
 		log.Printf("**TOTAL READ** Completed %d read requests (%d KVs per request) in %v (%d Requests/s)",
 			config.RBatchNum*config.RWorkers,
@@ -189,8 +191,8 @@ func main() {
 			int(math.Round(r_speed)))
 	}
 
-	if config.WWorkers > 0 && total_write_time != 0 {
-		w_speed := float64(config.WBatchNum*config.WWorkers) / float64(total_write_time.Seconds())
+	if config.WWorkers > 0 {
+		w_speed := float64(config.WBatchNum*config.WWorkers) / total_write_time.Seconds()
 
 		log.Printf("**TOTAL WRITE** Committed %d transactions (%d KVs per Tx) in %v (%d Txs/s)",
 			config.WBatchNum*config.WWorkers,

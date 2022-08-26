@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"log"
+	"math"
 	"math/rand"
 	"sync/atomic"
 	"time"
@@ -39,6 +40,7 @@ var config struct {
 	RWorkers       int
 	WWorkers       int
 	WSpeed         int
+	HashedKeys     bool
 	RandomPayloads bool
 }
 
@@ -48,25 +50,27 @@ func init() {
 	flag.StringVar(&config.Username, "user", "immudb", "Username for authenticating to immudb")
 	flag.StringVar(&config.Password, "pass", "immudb", "Password for authenticating to immudb")
 	flag.StringVar(&config.DBName, "db", "defaultdb", "Name of the database to use")
-	flag.IntVar(&config.WBatchNum, "write-batchnum", 5, "Number of write batches")
-	flag.IntVar(&config.RBatchNum, "read-batchnum", 5, "Number of read batches")
-	flag.IntVar(&config.WBatchSize, "write-batchsize", 1000, "Write batch size")
-	flag.IntVar(&config.RBatchSize, "read-batchsize", 1000, "Read batch size")
 	flag.IntVar(&config.RWorkers, "read-workers", 1, "Number of concurrent read processes")
 	flag.IntVar(&config.WWorkers, "write-workers", 1, "Number of concurrent insertion processes")
+	flag.IntVar(&config.RBatchNum, "read-batchnum", 5, "Number of read batches")
+	flag.IntVar(&config.WBatchNum, "write-batchnum", 5, "Number of write batches")
+	flag.IntVar(&config.RBatchSize, "read-batchsize", 1000, "Read batch size")
+	flag.IntVar(&config.WBatchSize, "write-batchsize", 1000, "Write batch size")
 	flag.IntVar(&config.WSpeed, "write-speed", 500, "Target write speed (KV writes per second). 0 to disable throttling")
 	flag.IntVar(&config.Seed, "seed", 0, "Key seed start")
 	flag.IntVar(&config.MaxSeed, "max-seed", 0, "Key seed max")
+	flag.BoolVar(&config.HashedKeys, "hashed-keys", false, "Use sha356 digests as keys")
 	flag.BoolVar(&config.RandomPayloads, "random-payloads", false, "Use random payloads when writing")
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
 }
 
 func main() {
-	log.Printf("Running on database: %s, using batchnum: %d/%d, read-batchsize: %d write-batchsize: %d and workers: %d/%d.\n",
-		config.DBName, config.RBatchNum, config.WBatchNum, config.RBatchSize, config.WBatchSize, config.RWorkers, config.WWorkers)
+	log.Printf("Running on database: %s, workers: %d/%d, batchnum: %d/%d, batchsize: %d/%d.\n",
+		config.DBName, config.RWorkers, config.WWorkers, config.RBatchNum, config.WBatchNum, config.RBatchSize, config.WBatchSize)
 	end := make(chan bool)
 	startRnd(64)
+
 	var totalReads, totalWrites int64
 
 	done := make(chan bool)
@@ -133,6 +137,7 @@ func main() {
 		}
 
 	}()
+
 	var total_read_count, total_write_count int64
 	var total_read_time, total_write_time float64
 
@@ -159,18 +164,22 @@ func main() {
 	for i := 0; i < config.RWorkers+config.WWorkers; i++ {
 		<-end
 	}
+
 	close(done)
+
 	<-end
+
 	if config.RWorkers > 0 && total_read_time != 0 {
 		var r_speed float64
 		r_speed = float64(total_read_count) / float64(total_read_time)
 		r_speed = r_speed * float64(config.RWorkers)
-		log.Printf("TOTAL READ: %d KV, speed %f KV/s", total_read_count, r_speed)
+		log.Printf("TOTAL READ: %d KV, speed %d read requests, %d KV/s", total_read_count, config.RBatchNum*config.RWorkers, int(math.Round(r_speed)))
 	}
+
 	if config.WWorkers > 0 && total_write_time != 0 {
 		var w_speed float64
 		w_speed = float64(total_write_count) / float64(total_write_time)
 		w_speed = w_speed * float64(config.WWorkers)
-		log.Printf("TOTAL WRITE: %d KV, speed %f KV/s", total_write_count, w_speed)
+		log.Printf("TOTAL WRITE: %d KV, speed %d transactions, %d KV/s", total_write_count, config.WBatchNum*config.WWorkers, int(math.Round(w_speed)))
 	}
 }

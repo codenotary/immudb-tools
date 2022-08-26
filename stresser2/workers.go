@@ -104,7 +104,11 @@ func readWorker(n int, totalCounter *int64) (counter int64, elapsed float64) {
 		} else {
 			kList := make([][]byte, config.RBatchSize)
 			for j := 0; j < config.RBatchSize; j++ {
-				kList[j] = h256(KeyTracker.getRKey())
+				if config.HashedKeys {
+					kList[j] = h256(KeyTracker.getRKey())
+				} else {
+					kList[j] = []byte(KeyTracker.getRKey())
+				}
 			}
 			_, err = client.GetAll(ctx, kList)
 		}
@@ -141,12 +145,20 @@ func writeWorker(n int, totalCounter *int64) (counter int64, elapsed float64) {
 		t1 = time.Now()
 
 		for j := 0; j < config.WBatchSize; j++ {
+			var k []byte
+
+			if config.HashedKeys {
+				k = h256(KeyTracker.getWKey())
+			} else {
+				k = []byte(KeyTracker.getWKey())
+			}
+
 			if config.RandomPayloads {
 				rnd.Read(v)
 			}
 
 			kvList.KVs[j] = &schema.KeyValue{
-				Key:   h256(KeyTracker.getWKey()),
+				Key:   k,
 				Value: v,
 			}
 		}

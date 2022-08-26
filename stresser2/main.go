@@ -69,7 +69,9 @@ func init() {
 func main() {
 	log.Printf("Running on database: %s, workers: %d/%d, batchnum: %d/%d, batchsize: %d/%d.\n",
 		config.DBName, config.RWorkers, config.WWorkers, config.RBatchNum, config.WBatchNum, config.RBatchSize, config.WBatchSize)
+
 	end := make(chan bool)
+
 	startRnd(64)
 
 	var totalReads, totalWrites int64
@@ -140,7 +142,7 @@ func main() {
 	}()
 
 	var total_read_count, total_write_count int64
-	var total_read_time, total_write_time float64
+	var total_read_time, total_write_time time.Duration
 	var totalReadMux, totalWriteMux sync.Mutex
 
 	for i := 0; i < config.WWorkers; i++ {
@@ -178,16 +180,22 @@ func main() {
 	<-end
 
 	if config.RWorkers > 0 && total_read_time != 0 {
-		var r_speed float64
-		r_speed = float64(total_read_count) / float64(total_read_time)
-		r_speed = r_speed * float64(config.RWorkers)
-		log.Printf("TOTAL READ: %d KV, speed %d read requests, %d KV/s", total_read_count, config.RBatchNum*config.RWorkers, int(math.Round(r_speed)))
+		r_speed := float64(config.RBatchNum*config.RWorkers) / float64(total_read_time.Seconds())
+
+		log.Printf("**TOTAL READ** Completed %d read requests (%d KVs per request) in %v (%d Requests/s)",
+			config.RBatchNum*config.RWorkers,
+			config.RBatchSize,
+			total_read_time,
+			int(math.Round(r_speed)))
 	}
 
 	if config.WWorkers > 0 && total_write_time != 0 {
-		var w_speed float64
-		w_speed = float64(total_write_count) / float64(total_write_time)
-		w_speed = w_speed * float64(config.WWorkers)
-		log.Printf("TOTAL WRITE: %d KV, speed %d transactions, %d KV/s", total_write_count, config.WBatchNum*config.WWorkers, int(math.Round(w_speed)))
+		w_speed := float64(config.WBatchNum*config.WWorkers) / float64(total_write_time.Seconds())
+
+		log.Printf("**TOTAL WRITE** Committed %d transactions (%d KVs per Tx) in %v (%d Txs/s)",
+			config.WBatchNum*config.WWorkers,
+			config.WBatchSize,
+			total_write_time,
+			int(math.Round(w_speed)))
 	}
 }

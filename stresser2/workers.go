@@ -88,7 +88,7 @@ func genKeyTracker() *keyTracker {
 	}
 }
 
-func readWorker(n int, totalCounter *int64) (counter int64, elapsed float64) {
+func readWorker(n int, totalCounter *int64) (counter int64, elapsed time.Duration) {
 	jobid := fmt.Sprintf("RJOB%02d", n)
 
 	ctx, client := connect(jobid)
@@ -121,13 +121,14 @@ func readWorker(n int, totalCounter *int64) (counter int64, elapsed float64) {
 		}
 	}
 
-	elapsed = float64(time.Since(t0).Seconds())
-	log.Printf("%s DONE: read %d entries in %.3fs, %.3f KV/s", jobid, counter, elapsed, float64(counter)/float64(time.Since(t0).Seconds()))
+	elapsed = time.Since(t0)
+
+	log.Printf("%s DONE: read %d entries in %v, %.3f KV/s", jobid, counter, elapsed, float64(counter)/float64(elapsed.Seconds()))
 
 	return counter, elapsed
 }
 
-func writeWorker(n int, totalCounter *int64) (counter int64, elapsed float64) {
+func writeWorker(n int, totalCounter *int64) (counter int64, elapsed time.Duration) {
 	jobid := fmt.Sprintf("WJOB%02d", n)
 
 	ctx, client := connect(jobid)
@@ -178,8 +179,9 @@ func writeWorker(n int, totalCounter *int64) (counter int64, elapsed float64) {
 
 	}
 
-	elapsed = float64(time.Since(t0).Seconds())
-	log.Printf("%s DONE: inserted %d entries in %.3fs, %.3f KV/s", jobid, counter, elapsed, float64(counter)/float64(time.Since(t0).Seconds()))
+	elapsed = time.Since(t0)
+
+	log.Printf("%s DONE: inserted %d entries in %v, %.3f KV/s", jobid, counter, elapsed, float64(counter)/float64(elapsed.Seconds()))
 
 	return counter, elapsed
 }

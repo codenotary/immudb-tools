@@ -21,6 +21,7 @@ import (
 	"log"
 	"math"
 	"math/rand"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -140,12 +141,15 @@ func main() {
 
 	var total_read_count, total_write_count int64
 	var total_read_time, total_write_time float64
+	var totalReadMux, totalWriteMux sync.Mutex
 
 	for i := 0; i < config.WWorkers; i++ {
 		go func(c int) {
 			n, t := writeWorker(c+1, &totalWrites)
+			totalWriteMux.Lock()
 			total_write_count += n
 			total_write_time += t
+			totalWriteMux.Unlock()
 			end <- true
 		}(i)
 	}
@@ -155,8 +159,12 @@ func main() {
 	for i := 0; i < config.RWorkers; i++ {
 		go func(c int) {
 			n, t := readWorker(c+1, &totalReads)
+
+			totalReadMux.Lock()
 			total_read_count += n
 			total_read_time += t
+			totalReadMux.Unlock()
+
 			end <- true
 		}(i)
 	}

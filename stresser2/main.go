@@ -25,19 +25,21 @@ import (
 )
 
 var config struct {
-	Seed      int
-	MaxSeed   int
-	IpAddr    string
-	Port      int
-	Username  string
-	Password  string
-	DBName    string
-	RBatchNum int
-	WBatchNum int
-	BatchSize int
-	RWorkers  int
-	WWorkers  int
-	WSpeed    int
+	Seed           int
+	MaxSeed        int
+	IpAddr         string
+	Port           int
+	Username       string
+	Password       string
+	DBName         string
+	RBatchNum      int
+	WBatchNum      int
+	WBatchSize     int
+	RBatchSize     int
+	RWorkers       int
+	WWorkers       int
+	WSpeed         int
+	RandomPayloads bool
 }
 
 func init() {
@@ -48,19 +50,21 @@ func init() {
 	flag.StringVar(&config.DBName, "db", "defaultdb", "Name of the database to use")
 	flag.IntVar(&config.WBatchNum, "write-batchnum", 5, "Number of write batches")
 	flag.IntVar(&config.RBatchNum, "read-batchnum", 5, "Number of read batches")
-	flag.IntVar(&config.BatchSize, "batchsize", 1000, "Batch size")
+	flag.IntVar(&config.WBatchSize, "write-batchsize", 1000, "Write batch size")
+	flag.IntVar(&config.RBatchSize, "read-batchsize", 1000, "Read batch size")
 	flag.IntVar(&config.RWorkers, "read-workers", 1, "Number of concurrent read processes")
 	flag.IntVar(&config.WWorkers, "write-workers", 1, "Number of concurrent insertion processes")
 	flag.IntVar(&config.WSpeed, "write-speed", 500, "Target write speed (KV writes per second). 0 to disable throttling")
 	flag.IntVar(&config.Seed, "seed", 0, "Key seed start")
 	flag.IntVar(&config.MaxSeed, "max-seed", 0, "Key seed max")
+	flag.BoolVar(&config.RandomPayloads, "random-payloads", false, "Use random payloads when writing")
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
 }
 
 func main() {
-	log.Printf("Running on database: %s, using batchnum: %d/%d, batchsize: %d and workers: %d/%d.\n",
-		config.DBName, config.RBatchNum, config.WBatchNum, config.BatchSize, config.RWorkers, config.WWorkers)
+	log.Printf("Running on database: %s, using batchnum: %d/%d, read-batchsize: %d write-batchsize: %d and workers: %d/%d.\n",
+		config.DBName, config.RBatchNum, config.WBatchNum, config.RBatchSize, config.WBatchSize, config.RWorkers, config.WWorkers)
 	end := make(chan bool)
 	startRnd(64)
 	var totalReads, totalWrites int64
@@ -134,7 +138,7 @@ func main() {
 
 	for i := 0; i < config.WWorkers; i++ {
 		go func(c int) {
-			n,t := writeWorker(c+1, &totalWrites)
+			n, t := writeWorker(c+1, &totalWrites)
 			total_write_count += n
 			total_write_time += t
 			end <- true
@@ -145,7 +149,7 @@ func main() {
 	time.Sleep(time.Millisecond * 10)
 	for i := 0; i < config.RWorkers; i++ {
 		go func(c int) {
-			n,t := readWorker(c+1, &totalReads)
+			n, t := readWorker(c+1, &totalReads)
 			total_read_count += n
 			total_read_time += t
 			end <- true
@@ -157,16 +161,16 @@ func main() {
 	}
 	close(done)
 	<-end
-	if config.RWorkers>0 && total_read_time!=0 {
+	if config.RWorkers > 0 && total_read_time != 0 {
 		var r_speed float64
-		r_speed=float64(total_read_count)/float64(total_read_time)
- 		r_speed=r_speed*float64(config.RWorkers)
+		r_speed = float64(total_read_count) / float64(total_read_time)
+		r_speed = r_speed * float64(config.RWorkers)
 		log.Printf("TOTAL READ: %d KV, speed %f KV/s", total_read_count, r_speed)
 	}
-	if config.WWorkers>0 && total_write_time!=0 {
+	if config.WWorkers > 0 && total_write_time != 0 {
 		var w_speed float64
-		w_speed=float64(total_write_count)/float64(total_write_time)
- 		w_speed=w_speed*float64(config.WWorkers)
+		w_speed = float64(total_write_count) / float64(total_write_time)
+		w_speed = w_speed * float64(config.WWorkers)
 		log.Printf("TOTAL WRITE: %d KV, speed %f KV/s", total_write_count, w_speed)
 	}
 }

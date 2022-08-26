@@ -17,6 +17,7 @@ package main
 
 import (
 	"context"
+	rnd "crypto/rand"
 	"crypto/sha256"
 	"fmt"
 	"log"
@@ -92,14 +93,17 @@ func readWorker(n int, totalCounter *int64) (counter int64, elapsed float64) {
 
 	ctx, client := connect(jobid)
 	defer client.CloseSession(ctx)
+
 	t0 := time.Now()
+
 	for i := 0; i < config.RBatchNum; i++ {
 		var err error
-		if config.BatchSize == 1 {
+
+		if config.RBatchSize == 1 {
 			_, err = client.Get(ctx, h256(KeyTracker.getRKey()))
 		} else {
-			kList := make([][]byte, config.BatchSize)
-			for j := 0; j < config.BatchSize; j++ {
+			kList := make([][]byte, config.RBatchSize)
+			for j := 0; j < config.RBatchSize; j++ {
 				kList[j] = h256(KeyTracker.getRKey())
 			}
 			_, err = client.GetAll(ctx, kList)
@@ -108,12 +112,14 @@ func readWorker(n int, totalCounter *int64) (counter int64, elapsed float64) {
 		if err != nil && !strings.Contains(err.Error(), "key not found") {
 			log.Fatalln("Failed to read the batch. Reason:", err)
 		} else {
-			counter += int64(config.BatchSize)
-			atomic.AddInt64(totalCounter, int64(config.BatchSize))
+			counter += int64(config.RBatchSize)
+			atomic.AddInt64(totalCounter, int64(config.RBatchSize))
 		}
 	}
-	elapsed=float64(time.Since(t0).Seconds())
+
+	elapsed = float64(time.Since(t0).Seconds())
 	log.Printf("%s DONE: read %d entries in %.3fs, %.3f KV/s", jobid, counter, elapsed, float64(counter)/float64(time.Since(t0).Seconds()))
+
 	return counter, elapsed
 }
 
@@ -122,35 +128,46 @@ func writeWorker(n int, totalCounter *int64) (counter int64, elapsed float64) {
 
 	ctx, client := connect(jobid)
 	defer client.CloseSession(ctx)
+
 	t0 := time.Now()
-	t1 := time.Now()
+
+	var t1 time.Time
+
+	kvList := &schema.SetRequest{KVs: make([]*schema.KeyValue, config.WBatchSize), NoWait: true}
+
+	v := make([]byte, 256)
+
 	for i := 0; i < config.WBatchNum; i++ {
 		t1 = time.Now()
 
-		kvs := make([]*schema.KeyValue, config.BatchSize)
+		for j := 0; j < config.WBatchSize; j++ {
+			if config.RandomPayloads {
+				rnd.Read(v)
+			}
 
-		for j := 0; j < config.BatchSize; j++ {
-			kvs[j] = &schema.KeyValue{
+			kvList.KVs[j] = &schema.KeyValue{
 				Key:   h256(KeyTracker.getWKey()),
-				Value: getPayload(256),
+				Value: v,
 			}
 		}
 
-		kvList := &schema.SetRequest{KVs: kvs, NoWait: true}
 		if _, err := client.SetAll(ctx, kvList); err != nil {
 			log.Fatalln("Failed to submit the batch. Reason:", err)
 		} else {
-			counter += int64(config.BatchSize)
-			atomic.AddInt64(totalCounter, int64(config.BatchSize))
+			counter += int64(config.WBatchSize)
+			atomic.AddInt64(totalCounter, int64(config.WBatchSize))
 		}
+
 		if config.WSpeed > 0 {
 			dt := time.Since(t1)
-			sleepTime := (1000.0 * float64(config.BatchSize) / float64(config.WSpeed)) - float64(dt.Milliseconds())
+			sleepTime := (1000.0 * float64(config.WBatchSize) / float64(config.WSpeed)) - float64(dt.Milliseconds())
 			time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 		}
 
 	}
-	elapsed=float64(time.Since(t0).Seconds())
+
+	elapsed = float64(time.Since(t0).Seconds())
 	log.Printf("%s DONE: inserted %d entries in %.3fs, %.3f KV/s", jobid, counter, elapsed, float64(counter)/float64(time.Since(t0).Seconds()))
+
 	return counter, elapsed
 }

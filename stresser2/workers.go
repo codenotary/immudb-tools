@@ -136,7 +136,7 @@ func writeWorker(n int, totalCounter *int64) (counter int64, elapsed time.Durati
 
 	var t1 time.Time
 
-	kvList := &schema.SetRequest{KVs: make([]*schema.KeyValue, config.WBatchSize), NoWait: true}
+	kvList := &schema.SetRequest{KVs: make([]*schema.KeyValue, config.WBatchSize), NoWait: config.RWorkers == 0}
 
 	v := make([]byte, 256)
 

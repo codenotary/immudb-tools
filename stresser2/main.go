@@ -42,7 +42,9 @@ var config struct {
 	WWorkers       int
 	WSpeed         int
 	HashedKeys     bool
+	KeySize        int
 	RandomPayloads bool
+	PayloadSize    int
 }
 
 func init() {
@@ -60,8 +62,10 @@ func init() {
 	flag.IntVar(&config.WSpeed, "write-speed", 500, "Target write speed (KV writes per second). 0 to disable throttling")
 	flag.IntVar(&config.Seed, "seed", 0, "Key seed start")
 	flag.IntVar(&config.MaxSeed, "max-seed", 0, "Key seed max")
+	flag.IntVar(&config.KeySize, "key-size", 10, "Key size. Note when keys are hashed the key size becomes 32bytes")
 	flag.BoolVar(&config.HashedKeys, "hashed-keys", false, "Use sha356 digests as keys")
 	flag.BoolVar(&config.RandomPayloads, "random-payloads", false, "Use random payloads when writing")
+	flag.IntVar(&config.PayloadSize, "payload-size", 256, "Payload size. When payloads are non-random it's just 0s")
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
 }
@@ -200,5 +204,6 @@ func main() {
 			config.WBatchSize,
 			total_write_time,
 			int(math.Round(w_speed)))
+
 	}
 }

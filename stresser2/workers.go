@@ -45,9 +45,9 @@ func connect(jobid string) (context.Context, immuclient.ImmuClient) {
 	return ctx, client
 }
 
-func h256(s string) []byte {
+func h256(b []byte) []byte {
 	h := sha256.New()
-	h.Write([]byte(s))
+	h.Write(b)
 	return h.Sum(nil)
 }
 
@@ -63,21 +63,30 @@ func init() {
 	KeyTracker = genKeyTracker()
 }
 
-func (kt *keyTracker) getWKey() string {
+func (kt *keyTracker) getWKey() []byte {
 	kt.mx.Lock()
 	defer kt.mx.Unlock()
 	kt.max++
-	return fmt.Sprintf("KEY:%10d", kt.max)
+
+	key := make([]byte, config.KeySize)
+	copy(key, []byte(fmt.Sprintf("KEY:%10d", kt.max)))
+
+	return key
 }
 
-func (kt *keyTracker) getRKey() string {
+func (kt *keyTracker) getRKey() []byte {
 	kt.mx.RLock()
 	defer kt.mx.RUnlock()
 	var k = kt.start
 	if kt.max-kt.start > 0 {
 		k += rand.Intn(kt.max - kt.start)
 	}
-	return fmt.Sprintf("KEY:%10d", k)
+
+	key := make([]byte, config.KeySize)
+
+	copy(key, []byte(fmt.Sprintf("KEY:%10d", k)))
+
+	return key
 }
 
 func genKeyTracker() *keyTracker {
@@ -100,14 +109,20 @@ func readWorker(n int, totalCounter *int64) (counter int64, elapsed time.Duratio
 		var err error
 
 		if config.RBatchSize == 1 {
-			_, err = client.Get(ctx, h256(KeyTracker.getRKey()))
+			k := KeyTracker.getRKey()
+
+			if config.HashedKeys {
+				k = h256(k)
+			}
+
+			_, err = client.Get(ctx, k)
 		} else {
 			kList := make([][]byte, config.RBatchSize)
 			for j := 0; j < config.RBatchSize; j++ {
+				kList[j] = KeyTracker.getRKey()
+
 				if config.HashedKeys {
-					kList[j] = h256(KeyTracker.getRKey())
-				} else {
-					kList[j] = []byte(KeyTracker.getRKey())
+					kList[j] = h256(kList[j])
 				}
 			}
 			_, err = client.GetAll(ctx, kList)
@@ -138,21 +153,19 @@ func writeWorker(n int, totalCounter *int64) (counter int64, elapsed time.Durati
 
 	kvList := &schema.SetRequest{KVs: make([]*schema.KeyValue, config.WBatchSize), NoWait: config.RWorkers == 0}
 
-	v := make([]byte, 256)
-
 	t0 := time.Now()
 
 	for i := 0; i < config.WBatchNum; i++ {
 		t1 = time.Now()
 
 		for j := 0; j < config.WBatchSize; j++ {
-			var k []byte
+			k := KeyTracker.getWKey()
 
 			if config.HashedKeys {
-				k = h256(KeyTracker.getWKey())
-			} else {
-				k = []byte(KeyTracker.getWKey())
+				k = h256(k)
 			}
+
+			v := make([]byte, config.PayloadSize)
 
 			if config.RandomPayloads {
 				rnd.Read(v)

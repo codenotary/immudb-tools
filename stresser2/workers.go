@@ -19,6 +19,7 @@ import (
 	"context"
 	rnd "crypto/rand"
 	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"math/rand"
@@ -69,7 +70,7 @@ func (kt *keyTracker) getWKey() []byte {
 	kt.max++
 
 	key := make([]byte, config.KeySize)
-	copy(key, []byte(fmt.Sprintf("KEY:%10d", kt.max)))
+	binary.BigEndian.PutUint32(key, uint32(kt.max))
 
 	return key
 }
@@ -83,8 +84,7 @@ func (kt *keyTracker) getRKey() []byte {
 	}
 
 	key := make([]byte, config.KeySize)
-
-	copy(key, []byte(fmt.Sprintf("KEY:%10d", k)))
+	binary.BigEndian.PutUint32(key, uint32(k))
 
 	return key
 }

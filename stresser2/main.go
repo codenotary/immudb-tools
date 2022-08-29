@@ -62,7 +62,7 @@ func init() {
 	flag.IntVar(&config.WSpeed, "write-speed", 500, "Target write speed (KV writes per second). 0 to disable throttling")
 	flag.IntVar(&config.Seed, "seed", 0, "Key seed start")
 	flag.IntVar(&config.MaxSeed, "max-seed", 0, "Key seed max")
-	flag.IntVar(&config.KeySize, "key-size", 10, "Key size. Note when keys are hashed the key size becomes 32bytes")
+	flag.IntVar(&config.KeySize, "key-size", 8, "Key size. Note when keys are hashed the key size becomes 32bytes")
 	flag.BoolVar(&config.HashedKeys, "hashed-keys", false, "Use sha356 digests as keys")
 	flag.BoolVar(&config.RandomPayloads, "random-payloads", false, "Use random payloads when writing")
 	flag.IntVar(&config.PayloadSize, "payload-size", 256, "Payload size. When payloads are non-random it's just 0s")
@@ -73,6 +73,10 @@ func init() {
 func main() {
 	log.Printf("Running on database: %s, workers: %d/%d, batchnum: %d/%d, batchsize: %d/%d.\n",
 		config.DBName, config.RWorkers, config.WWorkers, config.RBatchNum, config.WBatchNum, config.RBatchSize, config.WBatchSize)
+
+	if config.KeySize < 4 {
+		log.Fatalf("invalid key size %d", config.KeySize)
+	}
 
 	end := make(chan bool)
 

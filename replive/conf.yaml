@@ -1,0 +1,11 @@
+master:
+  - host: 0.0.0.0
+    port: 3322
+    name: master
+    db: db
+
+followers:
+  - host: 0.0.0.0
+    port: 3324
+    name: follower
+    db: db

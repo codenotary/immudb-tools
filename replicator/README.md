@@ -34,6 +34,14 @@ Usage of ./replicator:
         Port number of immudb replica (default 3322)
   -replica-user string
         Admin username for replica immudb (default "immudb")
+ -replication-sync string
+        Option to sync asynchronous/synchronous replicated databases (default "auto")
+  -replication-allow-tx-discarding
+        Allow precommitted transactions to be discarded if the follower diverges from the master
+  -replication-commit-concurrency int
+        Number of concurrent replications (default 10)
+  -replication-prefetch-tx-buffer-size int
+        Maximum number of prefeched transactions (default 100)
 ```
 
 Since the tool needs to connect to two different immudb instance, you have to provide credentials for both of them: address, port, username and password must be set for both the master instance and the replica.

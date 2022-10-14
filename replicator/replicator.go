@@ -20,16 +20,19 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/hex"
+	"errors"
 	"flag"
-	"github.com/codenotary/immudb/pkg/api/schema"
-	"github.com/codenotary/immudb/pkg/auth"
-	immuclient "github.com/codenotary/immudb/pkg/client"
-	"google.golang.org/grpc/metadata"
 	"log"
 	"os"
 	"regexp"
 	"sort"
 	"time"
+
+	"github.com/codenotary/immudb/pkg/api/schema"
+	"github.com/codenotary/immudb/pkg/auth"
+	immuclient "github.com/codenotary/immudb/pkg/client"
+	"github.com/codenotary/immudb/pkg/replication"
+	"google.golang.org/grpc/metadata"
 )
 
 var (
@@ -40,19 +43,23 @@ var (
 )
 
 var config struct {
-	MasterAddr       string
-	MasterPort       int
-	MasterUsername   string
-	MasterPassword   string
-	ReplicaAddr      string
-	ReplicaPort      int
-	ReplicaUsername  string
-	ReplicaPassword  string
-	FollowerUsername string
-	FollowerPassword string
-	Port             int
-	Delay            int
-	Datadir          string
+	MasterAddr                   string
+	MasterPort                   int
+	MasterUsername               string
+	MasterPassword               string
+	ReplicaAddr                  string
+	ReplicaPort                  int
+	ReplicaUsername              string
+	ReplicaPassword              string
+	FollowerUsername             string
+	FollowerPassword             string
+	Port                         int
+	Delay                        int
+	Datadir                      string
+	ReplicationSync              string
+	PrefetchTxBufferSize         int
+	ReplicationCommitConcurrency int
+	AllowTxDiscarding            bool
 }
 
 func init() {
@@ -94,6 +101,11 @@ func init() {
 
 	flag.IntVar(&config.Delay, "delay", 3600, "Delay between compactions in seconds")
 	flag.StringVar(&config.Datadir, "data-dir", config.Datadir, "Immudb data directory (for backup) [DATADIR]")
+
+	flag.StringVar(&config.ReplicationSync, "replication-sync", "auto", "Option to sync asynchronous/synchronous replicated databases")
+	flag.IntVar(&config.PrefetchTxBufferSize, "replication-prefetch-tx-buffer-size", replication.DefaultPrefetchTxBufferSize, "Maximum number of prefeched transactions")
+	flag.IntVar(&config.ReplicationCommitConcurrency, "replication-commit-concurrency", replication.DefaultReplicationCommitConcurrency, "Number of concurrent replications")
+	flag.BoolVar(&config.AllowTxDiscarding, "replication-allow-tx-discarding", replication.DefaultAllowTxDiscarding, "Allow precommitted transactions to be discarded if the follower diverges from the master")
 	flag.Parse()
 
 	if s, err := aesdecrypt(config.MasterPassword); err == nil {
@@ -310,14 +322,38 @@ func config_replica(m_ctx context.Context, m_cli immuclient.ImmuClient, r_ctx co
 		}
 	}
 	settings := settings_resp.Settings
+
+	synAcks := settings_resp.Settings.ReplicationSettings.SyncAcks.GetValue()
+	isSynchronousDatabase := synAcks > 0
 	replication_settings := schema.ReplicationNullableSettings{
-		Replica:          &schema.NullableBool{Value: true},
-		MasterDatabase:   &schema.NullableString{Value: src_db},
-		MasterAddress:    &schema.NullableString{Value: config.MasterAddr},
-		MasterPort:       &schema.NullableUint32{Value: uint32(config.MasterPort)},
-		FollowerUsername: &schema.NullableString{Value: config.FollowerUsername},
-		FollowerPassword: &schema.NullableString{Value: config.FollowerPassword},
+		Replica:                      &schema.NullableBool{Value: true},
+		MasterDatabase:               &schema.NullableString{Value: src_db},
+		MasterAddress:                &schema.NullableString{Value: config.MasterAddr},
+		MasterPort:                   &schema.NullableUint32{Value: uint32(config.MasterPort)},
+		FollowerUsername:             &schema.NullableString{Value: config.FollowerUsername},
+		FollowerPassword:             &schema.NullableString{Value: config.FollowerPassword},
+		PrefetchTxBufferSize:         &schema.NullableUint32{Value: uint32(config.PrefetchTxBufferSize)},
+		ReplicationCommitConcurrency: &schema.NullableUint32{Value: uint32(config.ReplicationCommitConcurrency)},
 	}
+
+	switch config.ReplicationSync {
+	case "async": // asynchronous database settings
+		if isSynchronousDatabase { // verifying that the primary database is not setup for synchronous replication
+			log.Printf("warning: %s not an asynchronous database\n", src_db)
+		}
+	case "sync": // synchronous database settings
+		if !isSynchronousDatabase { // SyncAcks > 0 on the primary database implies that synchronous replication enabled for this db
+			return errors.New("not a synchronous database")
+		}
+		replication_settings.SyncReplication = &schema.NullableBool{Value: true}
+		replication_settings.AllowTxDiscarding = &schema.NullableBool{Value: config.AllowTxDiscarding}
+	case "auto": // sync database with any mode
+		if synAcks > 0 {
+			replication_settings.SyncReplication = &schema.NullableBool{Value: true}
+			replication_settings.AllowTxDiscarding = &schema.NullableBool{Value: config.AllowTxDiscarding}
+		}
+	}
+
 	settings.ReplicationSettings = &replication_settings
 
 	log.Printf("Creating database %s on replica server", dst_db)

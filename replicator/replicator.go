@@ -327,11 +327,11 @@ func config_replica(m_ctx context.Context, m_cli immuclient.ImmuClient, r_ctx co
 	isSynchronousDatabase := synAcks > 0
 	replication_settings := schema.ReplicationNullableSettings{
 		Replica:                      &schema.NullableBool{Value: true},
-		MasterDatabase:               &schema.NullableString{Value: src_db},
-		MasterAddress:                &schema.NullableString{Value: config.MasterAddr},
-		MasterPort:                   &schema.NullableUint32{Value: uint32(config.MasterPort)},
-		FollowerUsername:             &schema.NullableString{Value: config.FollowerUsername},
-		FollowerPassword:             &schema.NullableString{Value: config.FollowerPassword},
+		PrimaryDatabase:              &schema.NullableString{Value: src_db},
+		PrimaryHost:                  &schema.NullableString{Value: config.MasterAddr},
+		PrimaryPort:                  &schema.NullableUint32{Value: uint32(config.MasterPort)},
+		PrimaryUsername:              &schema.NullableString{Value: config.FollowerUsername},
+		PrimaryPassword:              &schema.NullableString{Value: config.FollowerPassword},
 		PrefetchTxBufferSize:         &schema.NullableUint32{Value: uint32(config.PrefetchTxBufferSize)},
 		ReplicationCommitConcurrency: &schema.NullableUint32{Value: uint32(config.ReplicationCommitConcurrency)},
 	}

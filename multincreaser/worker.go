@@ -45,6 +45,11 @@ func IncrementKey(client immuclient.ImmuClient, ctx context.Context, job, k *str
 		mx.Lock()
 		defer mx.Unlock()
 	}
+	_, err := client.SQLExec(ctx, "BEGIN TRANSACTION", nil)
+	if err != nil {
+		log.Printf("BEGIN error: %s", err.Error())
+		return nil, err
+	}
 	r, err := client.SQLQuery(ctx, "SELECT value FROM t WHERE id=@id", map[string]interface{}{"id": *k}, true)
 	if err != nil {
 		log.Printf("SELECT error: %s", err.Error())
@@ -58,6 +63,12 @@ func IncrementKey(client immuclient.ImmuClient, ctx context.Context, job, k *str
 		map[string]interface{}{"id": *k, "val": value})
 	if err != nil {
 		log.Printf("%s UPDATING %s to %d error: %s", *job, *k, value, err.Error())
+		return nil, err
+	}
+	_, err = client.SQLExec(ctx, "COMMIT", nil)
+	if err != nil {
+		log.Printf("COMMIT error: %s", err.Error())
+		return nil, err
 	}
 	return nil, err
 }

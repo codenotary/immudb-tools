@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,47 +28,31 @@ func connect(jobid string) (context.Context, immuclient.ImmuClient) {
 func expBackoff(f func() (any, error)) (any, error) {
 	var err error
 	var ret any
-	for i := 0; i < 8; i++ {
+	for i := 0; i < 20; i++ {
 		ret, err = f()
 		if err == nil {
 			return ret, err
 		}
-		time.Sleep(time.Millisecond * (10 << i))
+		time.Sleep(time.Millisecond * (1 << (i/2)))
 	}
 	ret, err = f()
 	return ret, err
 }
 
 var mx sync.Mutex
-
+var TxConflicts int64 = 0
 func IncrementKey(client immuclient.ImmuClient, ctx context.Context, job, k *string) (any, error) {
 	if config.Sync {
 		mx.Lock()
 		defer mx.Unlock()
 	}
-	_, err := client.SQLExec(ctx, "BEGIN TRANSACTION", nil)
+	_, err := client.SQLExec(ctx, "BEGIN TRANSACTION; UPDATE t SET value=value+1 WHERE id=@id; COMMIT", map[string]interface{}{"id": *k})
 	if err != nil {
-		log.Printf("BEGIN error: %s", err.Error())
-		return nil, err
-	}
-	r, err := client.SQLQuery(ctx, "SELECT value FROM t WHERE id=@id", map[string]interface{}{"id": *k}, true)
-	if err != nil {
-		log.Printf("SELECT error: %s", err.Error())
-		return nil, err
-	}
-	ret := r.Rows[0]
-	value := ret.Values[0].GetN()
-	value = value + 1
-	log.Printf("%s Setting %s to %d", *job, *k, value)
-	_, err = client.SQLExec(ctx, "UPDATE t SET value=@val WHERE id=@id",
-		map[string]interface{}{"id": *k, "val": value})
-	if err != nil {
-		log.Printf("%s UPDATING %s to %d error: %s", *job, *k, value, err.Error())
-		return nil, err
-	}
-	_, err = client.SQLExec(ctx, "COMMIT", nil)
-	if err != nil {
-		log.Printf("COMMIT error: %s", err.Error())
+		if strings.Contains(err.Error(), "tx read conflict") {
+			atomic.AddInt64(&TxConflicts, 1)
+		} else {
+			log.Printf("Error: %s", err.Error())
+		}
 		return nil, err
 	}
 	return nil, err

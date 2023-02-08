@@ -56,6 +56,7 @@ func main() {
 	end := make(chan bool)
 	kspace := NewKeyspace(config.KeySpace)
 	InitDB(kspace)
+	t0 := time.Now()
 	for i := 0; i < config.Workers; i++ {
 		go func(c int) {
 			Worker(c+1, &totalWrites, kspace)
@@ -65,6 +66,9 @@ func main() {
 	for i := 0; i < config.Workers; i++ {
 		<-end
 	}
+	t1 := time.Now()
 	totalReaded := TotalDB(kspace)
 	log.Printf("Work ended. Total written: %d Total Read: %d", totalWrites, totalReaded)
+	log.Printf("Time: %.3fs Conflicts: %d",t1.Sub(t0).Seconds(), TxConflicts)
+
 }

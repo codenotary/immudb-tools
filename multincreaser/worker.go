@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -26,17 +27,24 @@ func connect(jobid string) (context.Context, immuclient.ImmuClient) {
 func expBackoff(f func() (any, error)) (any, error) {
 	var err error
 	var ret any
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 8; i++ {
 		ret, err = f()
 		if err == nil {
 			return ret, err
 		}
-		time.Sleep(time.Millisecond*(10<<i))
+		time.Sleep(time.Millisecond * (10 << i))
 	}
+	ret, err = f()
 	return ret, err
 }
 
+var mx sync.Mutex
+
 func IncrementKey(client immuclient.ImmuClient, ctx context.Context, job, k *string) (any, error) {
+	if config.Sync {
+		mx.Lock()
+		defer mx.Unlock()
+	}
 	r, err := client.SQLQuery(ctx, "SELECT value FROM t WHERE id=@id", map[string]interface{}{"id": *k}, true)
 	if err != nil {
 		log.Printf("SELECT error: %s", err.Error())
@@ -48,7 +56,7 @@ func IncrementKey(client immuclient.ImmuClient, ctx context.Context, job, k *str
 	log.Printf("%s Setting %s to %d", *job, *k, value)
 	_, err = client.SQLExec(ctx, "UPDATE t SET value=@val WHERE id=@id",
 		map[string]interface{}{"id": *k, "val": value})
-	if err!=nil {
+	if err != nil {
 		log.Printf("%s UPDATING %s to %d error: %s", *job, *k, value, err.Error())
 	}
 	return nil, err
@@ -61,7 +69,7 @@ func Worker(n int, total *int64, keys *Keyspace) {
 	for i := 0; i < config.WorkSize; i++ {
 		k := keys.GetRandomKey()
 		_, err := expBackoff(func() (any, error) { return IncrementKey(client, ctx, &jobid, k) })
-		if err==nil {
+		if err == nil {
 			atomic.AddInt64(total, 1)
 		}
 	}

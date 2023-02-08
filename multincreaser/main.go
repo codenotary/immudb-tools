@@ -32,6 +32,7 @@ var config struct {
 	Workers  int
 	WorkSize int
 	KeySpace int
+	Sync     bool
 }
 
 func init() {
@@ -44,6 +45,7 @@ func init() {
 	flag.IntVar(&config.Workers, "workers", 1, "Number of concurrent processes")
 	flag.IntVar(&config.WorkSize, "worksize", 10, "Number of read/write iterations")
 	flag.IntVar(&config.KeySpace, "keyspace", 10, "Number of different keys to operate with")
+	flag.BoolVar(&config.Sync, "sync", false, "Force synchronization using mutex")
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
 }

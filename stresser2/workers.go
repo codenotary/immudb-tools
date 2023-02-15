@@ -44,9 +44,9 @@ func connect(jobid string) (context.Context, immuclient.ImmuClient) {
 	return ctx, client
 }
 
-func h256(s string) []byte {
+func h256(b []byte) []byte {
 	h := sha256.New()
-	h.Write([]byte(s))
+	h.Write(b)
 	return h.Sum(nil)
 }
 
@@ -62,21 +62,21 @@ func init() {
 	KeyTracker = genKeyTracker()
 }
 
-func (kt *keyTracker) getWKey() string {
+func (kt *keyTracker) getWKey() []byte {
 	kt.mx.Lock()
 	defer kt.mx.Unlock()
 	kt.max++
-	return fmt.Sprintf("KEY:%10d", kt.max)
+	return []byte(fmt.Sprintf("KEY:%10d", kt.max))
 }
 
-func (kt *keyTracker) getRKey() string {
+func (kt *keyTracker) getRKey() []byte {
 	kt.mx.RLock()
 	defer kt.mx.RUnlock()
 	var k = kt.start
 	if kt.max-kt.start > 0 {
 		k += rand.Intn(kt.max - kt.start)
 	}
-	return fmt.Sprintf("KEY:%10d", k)
+	return []byte(fmt.Sprintf("KEY:%10d", k))
 }
 
 func genKeyTracker() *keyTracker {

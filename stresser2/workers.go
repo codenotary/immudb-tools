@@ -66,7 +66,11 @@ func (kt *keyTracker) getWKey() []byte {
 	kt.mx.Lock()
 	defer kt.mx.Unlock()
 	kt.max++
-	return []byte(fmt.Sprintf("KEY:%10d", kt.max))
+
+	key := make([]byte, config.KeySize)
+	binary.BigEndian.PutUint32(key, uint32(kt.max))
+
+	return key
 }
 
 func (kt *keyTracker) getRKey() []byte {
@@ -76,7 +80,11 @@ func (kt *keyTracker) getRKey() []byte {
 	if kt.max-kt.start > 0 {
 		k += rand.Intn(kt.max - kt.start)
 	}
-	return []byte(fmt.Sprintf("KEY:%10d", k))
+
+	key := make([]byte, config.KeySize)
+	binary.BigEndian.PutUint32(key, uint32(k))
+
+	return key
 }
 
 func genKeyTracker() *keyTracker {

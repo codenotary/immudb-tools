@@ -142,7 +142,7 @@ func writeWorker(n int, totalCounter *int64) (counter int64, elapsed float64) {
 
 		for j := 0; j < config.BatchSize; j++ {
 			kvList.KVs[j] = &schema.KeyValue{
-				Key:   h256(KeyTracker.getWKey()),
+				Key:   KeyTracker.getWKey(),
 				Value: getPayload(256),
 			}
 		}

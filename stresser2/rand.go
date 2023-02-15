@@ -18,6 +18,7 @@ package main
 import (
 	"math/rand"
 	"runtime"
+	rnd "crypto/rand"
 )
 
 const hexDigits = "0123456789abcdef"
@@ -58,6 +59,6 @@ func getRnd() []byte {
 
 func getPayload(size int) []byte {
 	b := make([]byte, size)
-	rand.Read(b)
+	rnd.Read(b)
 	return b
 }

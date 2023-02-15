@@ -122,21 +122,22 @@ func writeWorker(n int, totalCounter *int64) (counter int64, elapsed float64) {
 
 	ctx, client := connect(jobid)
 	defer client.CloseSession(ctx)
+
+	var t1 time.Time
+
+	kvList := &schema.SetRequest{KVs: make([]*schema.KeyValue, config.BatchSize), NoWait: config.RWorkers == 0}
+
 	t0 := time.Now()
-	t1 := time.Now()
 	for i := 0; i < config.WBatchNum; i++ {
 		t1 = time.Now()
 
-		kvs := make([]*schema.KeyValue, config.BatchSize)
-
 		for j := 0; j < config.BatchSize; j++ {
-			kvs[j] = &schema.KeyValue{
+			kvList.KVs[j] = &schema.KeyValue{
 				Key:   h256(KeyTracker.getWKey()),
 				Value: getPayload(256),
 			}
 		}
 
-		kvList := &schema.SetRequest{KVs: kvs, NoWait: true}
 		if _, err := client.SetAll(ctx, kvList); err != nil {
 			log.Fatalln("Failed to submit the batch. Reason:", err)
 		} else {

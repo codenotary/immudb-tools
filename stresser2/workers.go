@@ -18,6 +18,7 @@ package main
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"math/rand"

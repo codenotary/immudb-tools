@@ -64,7 +64,7 @@ func (t *t_tx) Commit() {
 	}
 	var err error
 	var i int
-	for i = 0; i < 5; i++ {
+	for i = 0; i < 15; i++ {
 		t.tx, err = t.ic.NewTx(t.ctx)
 		// t.tx, err = t.ic.NewTx(t.ctx, immudb.UnsafeMVCC(), immudb.SnapshotMustIncludeTxID(0), immudb.SnapshotRenewalPeriod(0))
 		if err != nil {
@@ -77,7 +77,7 @@ func (t *t_tx) Commit() {
 			}
 		}
 		log.Printf("[%s] Committing %d / %d", t.name, len(t.statements), t.total)
-		_, err := t.tx.Commit(t.ctx)
+		_, err = t.tx.Commit(t.ctx)
 		if err == nil {
 			break
 		}
@@ -86,7 +86,7 @@ func (t *t_tx) Commit() {
 		time.Sleep(time.Duration((i+1)*(i+1)*5) * time.Millisecond)
 	}
 	if err != nil {
-		log.Fatal("[%s] TX error: %s, abort", t.name, err)
+		log.Fatalf("[%s] TX error: %s, abort", t.name, err)
 	}
 	if i>0 {
 		log.Printf("[%s] Committing %d / %d: success after %d attempts", t.name, len(t.statements), t.total, i)

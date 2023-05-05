@@ -42,12 +42,12 @@ type t_tx struct {
 
 func MakeTx(ctx context.Context, client immudb.ImmuClient, name string, txsize int) *t_tx {
 	return &t_tx{
-		name:  name,
-		tx:    nil,
-		ctx:   ctx,
-		ic:    client,
+		name:   name,
+		tx:     nil,
+		ctx:    ctx,
+		ic:     client,
 		txsize: txsize,
-		total: 0,
+		total:  0,
 	}
 }
 
@@ -88,7 +88,7 @@ func (t *t_tx) Commit() {
 	if err != nil {
 		log.Fatalf("[%s] TX error: %s, abort", t.name, err)
 	}
-	if i>0 {
+	if i > 0 {
 		log.Printf("[%s] Committing %d / %d: success after %d attempts", t.name, len(t.statements), t.total, i)
 	}
 	t.total = t.total + len(t.statements)

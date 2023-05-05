@@ -1,16 +1,17 @@
 package main
+
 import (
 	"context"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"os"
-	"fmt"
 	"time"
 
 	immudb "github.com/codenotary/immudb/pkg/client"
-
 )
+
 type cfg struct {
 	IpAddr   string
 	Port     int
@@ -49,7 +50,6 @@ func init_log(c *cfg) {
 	}
 }
 
-
 func connect(config *cfg) (immudb.ImmuClient, context.Context) {
 	log.Print("Connecting")
 	ctx := context.Background()
@@ -83,17 +83,16 @@ func createTable(c *cfg) {
 	client.CloseSession(ctx)
 }
 
-
 func worker(c *cfg, wid int) {
 	log.Printf("Starting worker %d", wid)
 	client, ctx := connect(c)
-	tx := MakeTx(ctx, client, fmt.Sprintf("W%2.2d",wid), c.TxSize)
+	tx := MakeTx(ctx, client, fmt.Sprintf("W%2.2d", wid), c.TxSize)
 	qt := `insert into logs(ts, address, severity, facility, log) values ( NOW(), '%s', %d, %d, '%s');`
-	for i:=0; i<c.Rows; i++ {
-		ip := <- randIP
-		sev := <- randByte
-		fac := <- randByte
-		log := <- randLog
+	for i := 0; i < c.Rows; i++ {
+		ip := <-randIP
+		sev := <-randByte
+		fac := <-randByte
+		log := <-randLog
 		msg := fmt.Sprintf("W%2.2d:%d-%s", wid, i, log)
 		q := fmt.Sprintf(qt, ip, sev, fac, msg)
 		tx.Add(q)
@@ -102,21 +101,21 @@ func worker(c *cfg, wid int) {
 	client.CloseSession(ctx)
 }
 
-
 func main() {
 	c := parseConfig()
 	init_log(c)
 	createTable(c)
 	end := make(chan bool)
 	t0 := time.Now()
-	for i:=0; i<c.Workers; i++ {
+	for i := 0; i < c.Workers; i++ {
 		go func(i int) {
 			worker(c, i)
 			end <- true
 		}(i)
 	}
-	for i:=0; i<c.Workers; i++ {
-		<- end
+	for i := 0; i < c.Workers; i++ {
+		<-end
 	}
-	log.Printf("Elapsed: %.3f",time.Since(t0).Seconds())
+	log.Printf("Elapsed: %.3f", time.Since(t0).Seconds())
+	log.Printf("Failed (and retried) TX: %d", retries)
 }

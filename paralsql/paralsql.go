@@ -70,7 +70,7 @@ func createTable(c *cfg) {
 	client, ctx := connect(c)
 	tx := MakeTx(ctx, client, "init", 100)
 	q := `CREATE TABLE IF NOT EXISTS logs (
-		id INTEGER AUTO_INCREMENT,
+		id INTEGER,
 		ts TIMESTAMP,
 		address VARCHAR NOT NULL,
 		severity INTEGER,
@@ -87,18 +87,28 @@ func worker(c *cfg, wid int) {
 	log.Printf("Starting worker %d", wid)
 	client, ctx := connect(c)
 	tx := MakeTx(ctx, client, fmt.Sprintf("W%2.2d", wid), c.TxSize)
-	qt := `insert into logs(ts, address, severity, facility, log) values ( NOW(), '%s', %d, %d, '%s');`
+	qt := `insert into logs(id, ts, address, severity, facility, log) values ( %d, NOW(), '%s', %d, %d, '%s');`
 	for i := 0; i < c.Rows; i++ {
+		id := <- seqId
 		ip := <-randIP
 		sev := <-randByte
 		fac := <-randByte
 		log := <-randLog
 		msg := fmt.Sprintf("W%2.2d:%d-%s", wid, i, log)
-		q := fmt.Sprintf(qt, ip, sev, fac, msg)
+		q := fmt.Sprintf(qt, id, ip, sev, fac, msg)
 		tx.Add(q)
 	}
 	tx.Commit()
 	client.CloseSession(ctx)
+}
+
+var seqId chan int
+func genSeq() {
+	seqId = make(chan int, 256)
+
+	for s:=0; ;s++ {
+		seqId <- s
+	}
 }
 
 func main() {
@@ -106,6 +116,7 @@ func main() {
 	init_log(c)
 	createTable(c)
 	end := make(chan bool)
+	go genSeq()
 	t0 := time.Now()
 	for i := 0; i < c.Workers; i++ {
 		go func(i int) {

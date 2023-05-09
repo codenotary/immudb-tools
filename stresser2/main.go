@@ -45,6 +45,8 @@ var config struct {
 	KeySize        int
 	RandomPayloads bool
 	PayloadSize    int
+	Silent         bool
+	Summary        bool
 }
 
 func init() {
@@ -66,14 +68,17 @@ func init() {
 	flag.BoolVar(&config.HashedKeys, "hashed-keys", false, "Use sha356 digests as keys")
 	flag.BoolVar(&config.RandomPayloads, "random-payloads", false, "Use random payloads when writing")
 	flag.IntVar(&config.PayloadSize, "payload-size", 256, "Payload size. When payloads are non-random it's just 0s")
+	flag.BoolVar(&config.Silent, "silent", false, "Don't print performance updates")
+	flag.BoolVar(&config.Summary, "summary", true, "Print final insertion summary")
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
 }
 
 func main() {
-	log.Printf("Running on database: %s, workers: %d/%d, batchnum: %d/%d, batchsize: %d/%d.\n",
-		config.DBName, config.RWorkers, config.WWorkers, config.RBatchNum, config.WBatchNum, config.RBatchSize, config.WBatchSize)
-
+	if config.Summary {
+		log.Printf("Running on database: %s, workers: %d/%d, batchnum: %d/%d, batchsize: %d/%d.\n",
+			config.DBName, config.RWorkers, config.WWorkers, config.RBatchNum, config.WBatchNum, config.RBatchSize, config.WBatchSize)
+	}
 	if config.KeySize < 4 {
 		log.Fatalf("invalid key size %d", config.KeySize)
 	}
@@ -104,13 +109,15 @@ func main() {
 				counterR := atomic.LoadInt64(&totalReads)
 				counterW := atomic.LoadInt64(&totalWrites)
 				t1 = time.Now()
-				log.Printf("DONE in %s: read %d entries, %f KV/s, wrote %d entries, %f KV/s",
-					time.Since(t0),
-					counterR,
-					float64(counterR)/float64(t1.Sub(t0).Seconds()),
-					counterW,
-					float64(counterW)/float64(t1.Sub(t0).Seconds()),
-				)
+				if !config.Silent {
+					log.Printf("DONE in %s: read %d entries, %f KV/s, wrote %d entries, %f KV/s",
+						time.Since(t0),
+						counterR,
+						float64(counterR)/float64(t1.Sub(t0).Seconds()),
+						counterW,
+						float64(counterW)/float64(t1.Sub(t0).Seconds()),
+					)
+				}
 				return
 
 			case <-ticker.C:
@@ -138,12 +145,14 @@ func main() {
 					}
 					lastCounterW = counterW
 				}
-				log.Printf(
-					"Read Speed: estimated %10.3f, instant %10.3f, average %10.3f (KV/sec), "+
-						"Write Speed: estimated %10.3f, instant %10.3f, average %10.3f (KV/sec)",
-					estSpeedR, lastSpeedR, avgSpeedR,
-					estSpeedW, lastSpeedW, avgSpeedW,
-				)
+				if !config.Silent {
+					log.Printf(
+						"Read Speed: estimated %10.3f, instant %10.3f, average %10.3f (KV/sec), "+
+							"Write Speed: estimated %10.3f, instant %10.3f, average %10.3f (KV/sec)",
+						estSpeedR, lastSpeedR, avgSpeedR,
+						estSpeedW, lastSpeedW, avgSpeedW,
+					)
+				}
 			}
 		}
 
@@ -192,22 +201,23 @@ func main() {
 
 	if config.RWorkers > 0 {
 		r_speed := float64(config.RBatchNum*config.RWorkers) / total_read_time.Seconds()
-
-		log.Printf("**TOTAL READ** %d read requests (%d KVs per request) in %v (%d Requests/s)",
-			config.RBatchNum*config.RWorkers,
-			config.RBatchSize,
-			total_read_time,
-			int(math.Round(r_speed)))
+		if config.Summary {
+			log.Printf("**TOTAL READ** %d read requests (%d KVs per request) in %v (%d Requests/s)",
+				config.RBatchNum*config.RWorkers,
+				config.RBatchSize,
+				total_read_time,
+				int(math.Round(r_speed)))
+		}
 	}
 
 	if config.WWorkers > 0 {
 		w_speed := float64(config.WBatchNum*config.WWorkers) / total_write_time.Seconds()
-
-		log.Printf("**TOTAL WRITE** %d transactions (%d KVs per Tx) in %v (%d Txs/s)",
-			config.WBatchNum*config.WWorkers,
-			config.WBatchSize,
-			total_write_time,
-			int(math.Round(w_speed)))
-
+		if !config.Summary {
+			log.Printf("**TOTAL WRITE** %d transactions (%d KVs per Tx) in %v (%d Txs/s)",
+				config.WBatchNum*config.WWorkers,
+				config.WBatchSize,
+				total_write_time,
+				int(math.Round(w_speed)))
+		}
 	}
 }

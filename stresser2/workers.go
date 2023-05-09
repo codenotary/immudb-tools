@@ -34,8 +34,10 @@ import (
 
 func connect(jobid string) (context.Context, immuclient.ImmuClient) {
 	tokenfile := "token-" + string(getRnd()[:8])
-	log.Printf("Job %s Tokenfile: %s", jobid, tokenfile)
-	log.Printf("Addr: %s", config.IpAddr)
+	if !config.Silent {
+		log.Printf("Job %s Tokenfile: %s", jobid, tokenfile)
+		log.Printf("Addr: %s", config.IpAddr)
+	}
 	opts := immuclient.DefaultOptions().WithAddress(config.IpAddr).WithPort(config.Port).WithTokenFileName(tokenfile)
 	client := immuclient.NewClient().WithOptions(opts)
 	ctx := context.Background()
@@ -137,9 +139,9 @@ func readWorker(n int, totalCounter *int64) (counter int64, elapsed time.Duratio
 	}
 
 	elapsed = time.Since(t0)
-
-	log.Printf("%s DONE: read %d entries in %v, %.3f KV/s", jobid, counter, elapsed, float64(counter)/elapsed.Seconds())
-
+	if !config.Silent {
+		log.Printf("%s DONE: read %d entries in %v, %.3f KV/s", jobid, counter, elapsed, float64(counter)/elapsed.Seconds())
+	}
 	return counter, elapsed
 }
 

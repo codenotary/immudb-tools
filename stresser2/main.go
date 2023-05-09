@@ -212,7 +212,7 @@ func main() {
 
 	if config.WWorkers > 0 {
 		w_speed := float64(config.WBatchNum*config.WWorkers) / total_write_time.Seconds()
-		if !config.Summary {
+		if config.Summary {
 			log.Printf("**TOTAL WRITE** %d transactions (%d KVs per Tx) in %v (%d Txs/s)",
 				config.WBatchNum*config.WWorkers,
 				config.WBatchSize,

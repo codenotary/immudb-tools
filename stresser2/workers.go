@@ -195,8 +195,8 @@ func writeWorker(n int, totalCounter *int64) (counter int64, elapsed time.Durati
 	}
 
 	elapsed = time.Since(t0)
-
+	if !config.Silent {
 	log.Printf("%s DONE: inserted %d entries in %v, %.3f KV/s, %.3f TX/s", jobid, counter, elapsed, float64(counter)/elapsed.Seconds(), float64(config.WBatchNum)/elapsed.Seconds())
-
+	}
 	return counter, elapsed
 }

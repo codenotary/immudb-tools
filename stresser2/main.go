@@ -222,10 +222,10 @@ func main() {
 	<-end
 
 	if config.RWorkers > 0 {
-		r_speed := float64(config.RBatchNum*config.RWorkers) / total_read_time.Seconds()
+		r_speed := float64(total_read_count) / total_read_time.Seconds()
 		if config.Summary {
 			log.Printf("**TOTAL READ** %d read requests (%d KVs per request) in %v (%d Requests/s)",
-				config.RBatchNum*config.RWorkers,
+				total_read_count,
 				config.RBatchSize,
 				total_read_time,
 				int(math.Round(r_speed)))
@@ -233,10 +233,10 @@ func main() {
 	}
 
 	if config.WWorkers > 0 {
-		w_speed := float64(config.WBatchNum*config.WWorkers) / total_write_time.Seconds()
+		w_speed := float64(total_write_count) / total_write_time.Seconds()
 		if config.Summary {
 			log.Printf("**TOTAL WRITE** %d transactions (%d KVs per Tx) in %v (%d Txs/s)",
-				config.WBatchNum*config.WWorkers,
+				total_write_count,
 				config.WBatchSize,
 				total_write_time,
 				int(math.Round(w_speed)))

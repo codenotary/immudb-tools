@@ -47,7 +47,10 @@ var config struct {
 	PayloadSize    int
 	Silent         bool
 	Summary        bool
+	Duration       int
 }
+
+var runForever *atomic.Bool
 
 func init() {
 	flag.StringVar(&config.IpAddr, "addr", "", "IP address of immudb server")
@@ -70,6 +73,7 @@ func init() {
 	flag.IntVar(&config.PayloadSize, "payload-size", 256, "Payload size. When payloads are non-random it's just 0s")
 	flag.BoolVar(&config.Silent, "silent", false, "Don't print performance updates")
 	flag.BoolVar(&config.Summary, "summary", true, "Print final insertion summary")
+	flag.IntVar(&config.Duration, "duration", 0, "Total test duration (ignores BatchNum)")
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
 }
@@ -161,6 +165,24 @@ func main() {
 	var total_read_count, total_write_count int64
 	var total_read_time, total_write_time time.Duration
 	var totalReadMux, totalWriteMux sync.Mutex
+	
+	runForever=&atomic.Bool{}
+	if config.Duration > 0 {
+		if !config.Silent {
+					log.Printf("Running for %d seconds", config.Duration)
+		}
+		runForever.Store(true)
+		runTimer := time.NewTimer(time.Duration(config.Duration) * time.Second)
+		go func() {
+			config.RBatchNum=0
+			config.WBatchNum=0
+			<- runTimer.C
+			runForever.Store(false)
+			if !config.Silent {
+					log.Printf("Quit after running for %d seconds", config.Duration)
+			}
+		}()
+	}
 
 	wt0 := time.Now()
 	for i := 0; i < config.WWorkers; i++ {

@@ -107,7 +107,7 @@ func readWorker(n int, totalCounter *int64) (counter int64, elapsed time.Duratio
 
 	t0 := time.Now()
 
-	for i := 0; i < config.RBatchNum; i++ {
+	for i := 0; runForever.Load() || i < config.RBatchNum; i++ {
 		var err error
 
 		if config.RBatchSize == 1 {
@@ -157,7 +157,7 @@ func writeWorker(n int, totalCounter *int64) (counter int64, elapsed time.Durati
 
 	t0 := time.Now()
 
-	for i := 0; i < config.WBatchNum; i++ {
+	for i := 0; runForever.Load() || i < config.WBatchNum; i++ {
 		t1 = time.Now()
 
 		for j := 0; j < config.WBatchSize; j++ {

@@ -76,20 +76,20 @@ func (t *t_tx) Commit() {
 				log.Fatalf("[%s] Error: %s", t.name, err)
 			}
 		}
-		log.Printf("[%s] Committing %d / %d", t.name, len(t.statements), t.total)
+		debug.Printf("[%s] Committing %d / %d", t.name, len(t.statements), t.total)
 		_, err = t.tx.Commit(t.ctx)
 		if err == nil {
 			break
 		}
 		atomic.AddUint64(&retries, 1)
-		log.Printf("[%s] Tx Error: %s, retrying", t.name, err)
+		debug.Printf("[%s] Tx Error: %s, retrying", t.name, err)
 		time.Sleep(time.Duration((i+1)*(i+1)*5) * time.Millisecond)
 	}
 	if err != nil {
 		log.Fatalf("[%s] TX error: %s, abort", t.name, err)
 	}
 	if i > 0 {
-		log.Printf("[%s] Committing %d / %d: success after %d attempts", t.name, len(t.statements), t.total, i)
+		debug.Printf("[%s] Committing %d / %d: success after %d attempts", t.name, len(t.statements), t.total, i)
 	}
 	t.total = t.total + len(t.statements)
 	t.statements = []string{}

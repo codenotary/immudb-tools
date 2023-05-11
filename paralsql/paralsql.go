@@ -7,8 +7,8 @@ import (
 	"io"
 	"log"
 	"os"
-	"time"
 	"sync/atomic"
+	"time"
 
 	immudb "github.com/codenotary/immudb/pkg/client"
 )
@@ -51,7 +51,7 @@ func init_log(c *cfg) {
 	if !c.Debug {
 		debug = log.New(io.Discard, "DEBUG", 0)
 	} else {
-		debug = log.New(os.Stderr, "DEBUG", log.LstdFlags|log.Lshortfile)
+		debug = log.New(os.Stderr, "DEBUG: ", log.LstdFlags|log.Lshortfile)
 	}
 }
 
@@ -89,7 +89,6 @@ func createTable(c *cfg) {
 	} else {
 		q = fmt.Sprintf(qb, "")
 	}
-	fmt.Println(q)
 	tx.Add(q)
 	tx.Commit()
 	client.CloseSession(ctx)
@@ -112,7 +111,7 @@ func worker(c *cfg, wid int) int {
 		if c.Autoincr {
 			q = fmt.Sprintf(qt1, ip, sev, fac, msg)
 		} else {
-			id := <- seqId
+			id := <-seqId
 			q = fmt.Sprintf(qt0, id, ip, sev, fac, msg)
 		}
 		tx.Add(q)
@@ -123,10 +122,11 @@ func worker(c *cfg, wid int) int {
 }
 
 var seqId chan int
+
 func genSeq() {
 	seqId = make(chan int, 256)
 
-	for s:=0; ;s++ {
+	for s := 0; ; s++ {
 		seqId <- s
 	}
 }
@@ -140,20 +140,20 @@ func main() {
 	end := make(chan int)
 	go genSeq()
 	t0 := time.Now()
-	runForever=&atomic.Bool{}
+	runForever = &atomic.Bool{}
 	if c.Duration > 0 {
 		runForever.Store(true)
 		runTimer := time.NewTimer(time.Duration(c.Duration) * time.Second)
 		go func() {
-			c.Rows=0
-			<- runTimer.C
+			c.Rows = 0
+			<-runTimer.C
 			runForever.Store(false)
 			log.Printf("Quit after running for %d seconds", c.Duration)
 		}()
 	} else {
 		runForever.Store(false)
 	}
-	
+
 	for i := 0; i < c.Workers; i++ {
 		go func(i int) {
 			end <- worker(c, i)
@@ -161,7 +161,7 @@ func main() {
 	}
 	total := 0
 	for i := 0; i < c.Workers; i++ {
-		t := <- end
+		t := <-end
 		total = total + t
 	}
 	elapsed := time.Since(t0).Seconds()

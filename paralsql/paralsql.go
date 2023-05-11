@@ -56,7 +56,7 @@ func init_log(c *cfg) {
 }
 
 func connect(config *cfg) (immudb.ImmuClient, context.Context) {
-	log.Print("Connecting")
+	debug.Print("Connecting")
 	ctx := context.Background()
 	opts := immudb.DefaultOptions().WithAddress(config.IpAddr).WithPort(config.Port)
 
@@ -95,7 +95,7 @@ func createTable(c *cfg) {
 }
 
 func worker(c *cfg, wid int) int {
-	log.Printf("Starting worker %d", wid)
+	debug.Printf("Starting worker %d", wid)
 	client, ctx := connect(c)
 	tx := MakeTx(ctx, client, fmt.Sprintf("W%2.2d", wid), c.TxSize)
 	qt0 := `insert into logs(id, ts, address, severity, facility, log) values ( %d, NOW(), '%s', %d, %d, '%s');`
@@ -153,7 +153,7 @@ func main() {
 	} else {
 		runForever.Store(false)
 	}
-
+	log.Printf("Starting %d workers, txsize %d\n", c.Workers, c.TxSize)
 	for i := 0; i < c.Workers; i++ {
 		go func(i int) {
 			end <- worker(c, i)

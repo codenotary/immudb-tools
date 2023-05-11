@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"time"
+	"sync/atomic"
 
 	immudb "github.com/codenotary/immudb/pkg/client"
 )
@@ -22,6 +23,8 @@ type cfg struct {
 	TxSize   int
 	Workers  int
 	Rows     int
+	Duration int
+	Autoincr bool
 }
 
 func parseConfig() (c *cfg) {
@@ -33,8 +36,10 @@ func parseConfig() (c *cfg) {
 	flag.StringVar(&c.DBName, "db", "defaultdb", "Name of the database to use")
 	flag.IntVar(&c.Workers, "workers", 1, "Number of workers")
 	flag.BoolVar(&c.Debug, "debug", false, "log level: debug")
+	flag.BoolVar(&c.Autoincr, "autoincrement", false, "use AUTOINCREMENT field")
 	flag.IntVar(&c.TxSize, "txsize", 256, "Transaction size")
 	flag.IntVar(&c.Rows, "rows", 1000, "Rows to be inserted by a worker")
+	flag.IntVar(&c.Duration, "duration", 0, "Total test duration in seconds(overrides rows)")
 	flag.Parse()
 	return
 }
@@ -69,8 +74,8 @@ func connect(config *cfg) (immudb.ImmuClient, context.Context) {
 func createTable(c *cfg) {
 	client, ctx := connect(c)
 	tx := MakeTx(ctx, client, "init", 100)
-	q := `CREATE TABLE IF NOT EXISTS logs (
-		id INTEGER,
+	qb := `CREATE TABLE IF NOT EXISTS logs (
+		id INTEGER %s,
 		ts TIMESTAMP,
 		address VARCHAR NOT NULL,
 		severity INTEGER,
@@ -78,28 +83,43 @@ func createTable(c *cfg) {
 		log VARCHAR,
 		PRIMARY KEY(id)
 	);`
+	var q string
+	if c.Autoincr {
+		q = fmt.Sprintf(qb, "AUTO_INCREMENT")
+	} else {
+		q = fmt.Sprintf(qb, "")
+	}
+	fmt.Println(q)
 	tx.Add(q)
 	tx.Commit()
 	client.CloseSession(ctx)
 }
 
-func worker(c *cfg, wid int) {
+func worker(c *cfg, wid int) int {
 	log.Printf("Starting worker %d", wid)
 	client, ctx := connect(c)
 	tx := MakeTx(ctx, client, fmt.Sprintf("W%2.2d", wid), c.TxSize)
-	qt := `insert into logs(id, ts, address, severity, facility, log) values ( %d, NOW(), '%s', %d, %d, '%s');`
-	for i := 0; i < c.Rows; i++ {
-		id := <- seqId
+	qt0 := `insert into logs(id, ts, address, severity, facility, log) values ( %d, NOW(), '%s', %d, %d, '%s');`
+	qt1 := `insert into logs(ts, address, severity, facility, log) values (NOW(), '%s', %d, %d, '%s');`
+	var i int
+	for i = 0; runForever.Load() || i < c.Rows; i++ {
 		ip := <-randIP
 		sev := <-randByte
 		fac := <-randByte
 		log := <-randLog
 		msg := fmt.Sprintf("W%2.2d:%d-%s", wid, i, log)
-		q := fmt.Sprintf(qt, id, ip, sev, fac, msg)
+		var q string
+		if c.Autoincr {
+			q = fmt.Sprintf(qt1, ip, sev, fac, msg)
+		} else {
+			id := <- seqId
+			q = fmt.Sprintf(qt0, id, ip, sev, fac, msg)
+		}
 		tx.Add(q)
 	}
 	tx.Commit()
 	client.CloseSession(ctx)
+	return i
 }
 
 var seqId chan int
@@ -111,22 +131,40 @@ func genSeq() {
 	}
 }
 
+var runForever *atomic.Bool
+
 func main() {
 	c := parseConfig()
 	init_log(c)
 	createTable(c)
-	end := make(chan bool)
+	end := make(chan int)
 	go genSeq()
 	t0 := time.Now()
+	runForever=&atomic.Bool{}
+	if c.Duration > 0 {
+		runForever.Store(true)
+		runTimer := time.NewTimer(time.Duration(c.Duration) * time.Second)
+		go func() {
+			c.Rows=0
+			<- runTimer.C
+			runForever.Store(false)
+			log.Printf("Quit after running for %d seconds", c.Duration)
+		}()
+	} else {
+		runForever.Store(false)
+	}
+	
 	for i := 0; i < c.Workers; i++ {
 		go func(i int) {
-			worker(c, i)
-			end <- true
+			end <- worker(c, i)
 		}(i)
 	}
+	total := 0
 	for i := 0; i < c.Workers; i++ {
-		<-end
+		t := <- end
+		total = total + t
 	}
-	log.Printf("Elapsed: %.3f", time.Since(t0).Seconds())
+	elapsed := time.Since(t0).Seconds()
 	log.Printf("Failed (and retried) TX: %d", retries)
+	log.Printf("Total Writes: %d, Elapsed: %.3f, %.3f writes/s", total, elapsed, float64(total)/elapsed)
 }

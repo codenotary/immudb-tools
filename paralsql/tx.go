@@ -64,7 +64,7 @@ func (t *t_tx) Commit() {
 	}
 	var err error
 	var i int
-	for i = 0; i < 15; i++ {
+	for i = 0; i < 255; i++ {
 		t.tx, err = t.ic.NewTx(t.ctx)
 		// t.tx, err = t.ic.NewTx(t.ctx, immudb.UnsafeMVCC(), immudb.SnapshotMustIncludeTxID(0), immudb.SnapshotRenewalPeriod(0))
 		if err != nil {

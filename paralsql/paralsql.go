@@ -137,7 +137,7 @@ func worker(c *cfg, wid int) int {
 	}
 	tx.Commit()
 	client.CloseSession(ctx)
-	return i
+	return i * c.InsertSize
 }
 
 var seqId chan int
@@ -172,7 +172,7 @@ func main() {
 	} else {
 		runForever.Store(false)
 	}
-	log.Printf("Starting %d workers, txsize %d\n", c.Workers, c.TxSize)
+	log.Printf("Starting %d workers, txsize %d, insert size %d\n", c.Workers, c.TxSize, c.InsertSize)
 	for i := 0; i < c.Workers; i++ {
 		go func(i int) {
 			end <- worker(c, i)

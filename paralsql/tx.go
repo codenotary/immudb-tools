@@ -79,6 +79,7 @@ func (t *t_tx) Commit() {
 		debug.Printf("[%s] Committing %d / %d", t.name, len(t.statements), t.total)
 		_, err = t.tx.Commit(t.ctx)
 		if err == nil {
+			debug.Printf("[%s] Insert done", t.name)
 			break
 		}
 		atomic.AddUint64(&retries, 1)

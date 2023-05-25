@@ -14,17 +14,18 @@ import (
 )
 
 type cfg struct {
-	IpAddr   string
-	Port     int
-	Username string
-	Password string
-	DBName   string
-	Debug    bool
-	TxSize   int
-	Workers  int
-	Rows     int
-	Duration int
-	Autoincr bool
+	IpAddr     string
+	Port       int
+	Username   string
+	Password   string
+	DBName     string
+	Debug      bool
+	TxSize     int
+	InsertSize int
+	Workers    int
+	Rows       int
+	Duration   int
+	Autoincr   bool
 }
 
 func parseConfig() (c *cfg) {
@@ -38,6 +39,7 @@ func parseConfig() (c *cfg) {
 	flag.BoolVar(&c.Debug, "debug", false, "log level: debug")
 	flag.BoolVar(&c.Autoincr, "autoincrement", false, "use AUTOINCREMENT field")
 	flag.IntVar(&c.TxSize, "txsize", 256, "Transaction size")
+	flag.IntVar(&c.InsertSize, "insert-size", 1, "Insert size (values per insert)")
 	flag.IntVar(&c.Rows, "rows", 1000, "Rows to be inserted by a worker")
 	flag.IntVar(&c.Duration, "duration", 0, "Total test duration in seconds(overrides rows)")
 	flag.Parse()
@@ -98,27 +100,44 @@ func worker(c *cfg, wid int) int {
 	debug.Printf("Starting worker %d", wid)
 	client, ctx := connect(c)
 	tx := MakeTx(ctx, client, fmt.Sprintf("W%2.2d", wid), c.TxSize)
-	qt0 := `insert into logs(id, ts, address, severity, facility, log) values ( %d, NOW(), '%s', %d, %d, '%s');`
-	qt1 := `insert into logs(ts, address, severity, facility, log) values (NOW(), '%s', %d, %d, '%s');`
+	qt0 := `insert into logs(id, ts, address, severity, facility, log) values `
+	qt1 := `insert into logs(ts, address, severity, facility, log) values `
+	v0 := `( %d, NOW(), '%s', %d, %d, '%s')`
+	v1 := `(NOW(), '%s', %d, %d, '%s')`
+
 	var i int
 	for i = 0; runForever.Load() || i < c.Rows; i++ {
-		ip := <-randIP
-		sev := <-randByte
-		fac := <-randByte
-		log := <-randLog
-		msg := fmt.Sprintf("W%2.2d:%d-%s", wid, i, log)
 		var q string
 		if c.Autoincr {
-			q = fmt.Sprintf(qt1, ip, sev, fac, msg)
+			q = qt1
 		} else {
-			id := <-seqId
-			q = fmt.Sprintf(qt0, id, ip, sev, fac, msg)
+			q = qt0
 		}
+
+		for j := 0; j < c.InsertSize; j++ {
+			ip := <-randIP
+			sev := <-randByte
+			fac := <-randByte
+			log := <-randLog
+			msg := fmt.Sprintf("W%2.2d:%d-%s", wid, i, log)
+			var qvar string
+			if c.Autoincr {
+				qvar = fmt.Sprintf(v1, ip, sev, fac, msg)
+			} else {
+				id := <-seqId
+				qvar = fmt.Sprintf(v0, id, ip, sev, fac, msg)
+			}
+			if j > 0 {
+				q = q + " , "
+			}
+			q = q + qvar
+		}
+		debug.Printf("QUERY: %s", q)
 		tx.Add(q)
 	}
 	tx.Commit()
 	client.CloseSession(ctx)
-	return i
+	return i * c.InsertSize
 }
 
 var seqId chan int
@@ -153,7 +172,7 @@ func main() {
 	} else {
 		runForever.Store(false)
 	}
-	log.Printf("Starting %d workers, txsize %d\n", c.Workers, c.TxSize)
+	log.Printf("Starting %d workers, txsize %d, insert size %d\n", c.Workers, c.TxSize, c.InsertSize)
 	for i := 0; i < c.Workers; i++ {
 		go func(i int) {
 			end <- worker(c, i)

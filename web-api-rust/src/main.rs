@@ -53,26 +53,30 @@ async fn open_session(cfg: &Cfg, client: &reqwest::Client) -> String {
 }
 
 async fn create_collection(cfg: &Cfg, client: &reqwest::Client, session: &str, collection: &str) {
-    let payload = format!(r#"{{
-            "name": "{}",
-            "documentIdFieldName": "person_id",
-            "fields": [
-                {{ "name": "first_name" }},
-                {{ "name": "last_name" }},
-                {{ "name": "address" }},
-                {{ "name": "email" }}
-            ]
-        }}"#, collection);
     println!("Creating collection: {:?}", collection);
     let url = format!("http://{}:{}/api/v2/collection/{}", cfg.address, cfg.port, collection);
-    let res = client.post(url)
-        .header("grpc-metadata-sessionid", session)
-        .header("content-type", "application/json")
-        .body(payload)
-        .send()
-        .await.expect("Unable to create collection");
-    if !res.status().is_success() {
-        panic!("Error: {}\n{}", res.status().as_u16(), res.text().await.expect("Unable to fetch response body"))
+    for attempt in 0..100 {
+        let payload = format!(r#"{{
+                "name": "{}",
+                "documentIdFieldName": "person_id",
+                "fields": [
+                    {{ "name": "first_name" }},
+                    {{ "name": "last_name" }},
+                    {{ "name": "address" }},
+                    {{ "name": "email" }}
+                ]
+            }}"#, collection);
+        let res = client.post(&url)
+            .header("grpc-metadata-sessionid", session)
+            .header("content-type", "application/json")
+            .body(payload)
+            .send()
+            .await.expect("Unable to create collection");
+        if res.status().is_success() {
+            break
+        }
+        println!("Error: {}\n{}", res.status().as_u16(), res.text().await.expect("Unable to fetch response body"));
+        tokio::time::sleep(tokio::time::Duration::from_millis(1*(attempt as u64))).await;
     }
 }
 

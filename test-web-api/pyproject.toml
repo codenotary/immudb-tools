@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "test-web-api"
+version = "0.1.0"
+description = ""
+authors = [""]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+requests = "^2.30.0"
+
+
+[build-system]
+requires = ["poetry-core=1.4.2"]
+build-backend = "poetry.core.masonry.api"

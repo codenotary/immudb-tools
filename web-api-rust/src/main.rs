@@ -146,17 +146,6 @@ async fn async_run(cfg: &Cfg, client: &reqwest::Client, idx: u16) {
     println!("WORKER {} End:", idx);
 }
 
-// async fn spawner(cfg: &Cfg) {
-//     let mut hh = Vec::new();
-//     for i in 0..cfg.workers {
-//         let cfg_copy = cfg.clone();
-//         hh.push(async_run(cfg_copy, i));
-//         };
-//     for h in hh {
-//         h.await;
-//     }
-// }
-
 async fn spawner(cfg: &Cfg) {
     let client = reqwest::Client::new();
     let workers = stream::iter(0..cfg.workers)

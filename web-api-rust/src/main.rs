@@ -1,14 +1,14 @@
-use std::collections::HashMap;
 use clap::Parser;
-use reqwest;
-use rand::distributions::{Alphanumeric, DistString};
-use faker_rand::en_us::names::{FirstName, LastName};
 use faker_rand::en_us::addresses::Address;
 use faker_rand::en_us::internet::Email;
+use faker_rand::en_us::names::{FirstName, LastName};
 use futures::{stream, StreamExt};
+use rand::distributions::{Alphanumeric, DistString};
+use reqwest;
+use std::collections::HashMap;
 
 // Configuration
-#[derive(Parser,Clone)]
+#[derive(Parser, Clone)]
 struct Cfg {
     #[arg(short, long, default_value = "127.0.0.1")]
     address: String,
@@ -43,20 +43,32 @@ async fn open_session(cfg: &Cfg, client: &reqwest::Client) -> String {
     map.insert("username", &cfg.username);
     map.insert("password", &cfg.password);
     map.insert("database", &cfg.database);
-    let url = format!("http://{}:{}/api/v2/authorization/session/open", cfg.address, cfg.port);
-    let res = client.post(url)
+    let url = format!(
+        "http://{}:{}/api/v2/authorization/session/open",
+        cfg.address, cfg.port
+    );
+    let res = client
+        .post(url)
         .json(&map)
         .send()
-        .await.expect("Unable to open session");
-    let sess = res.json::<ImmudbSession>().await.expect("Unable to get response");
+        .await
+        .expect("Unable to open session");
+    let sess = res
+        .json::<ImmudbSession>()
+        .await
+        .expect("Unable to get response");
     sess.sessionID
 }
 
 async fn create_collection(cfg: &Cfg, client: &reqwest::Client, session: &str, collection: &str) {
     println!("Creating collection: {:?}", collection);
-    let url = format!("http://{}:{}/api/v2/collection/{}", cfg.address, cfg.port, collection);
+    let url = format!(
+        "http://{}:{}/api/v2/collection/{}",
+        cfg.address, cfg.port, collection
+    );
     for attempt in 0..100 {
-        let payload = format!(r#"{{
+        let payload = format!(
+            r#"{{
                 "name": "{}",
                 "documentIdFieldName": "person_id",
                 "fields": [
@@ -65,18 +77,26 @@ async fn create_collection(cfg: &Cfg, client: &reqwest::Client, session: &str, c
                     {{ "name": "address" }},
                     {{ "name": "email" }}
                 ]
-            }}"#, collection);
-        let res = client.post(&url)
+            }}"#,
+            collection
+        );
+        let res = client
+            .post(&url)
             .header("grpc-metadata-sessionid", session)
             .header("content-type", "application/json")
             .body(payload)
             .send()
-            .await.expect("Unable to create collection");
+            .await
+            .expect("Unable to create collection");
         if res.status().is_success() {
-            break
+            break;
         }
-        println!("Error: {}\n{}", res.status().as_u16(), res.text().await.expect("Unable to fetch response body"));
-        tokio::time::sleep(tokio::time::Duration::from_millis(1*(attempt as u64))).await;
+        println!(
+            "Error: {}\n{}",
+            res.status().as_u16(),
+            res.text().await.expect("Unable to fetch response body")
+        );
+        tokio::time::sleep(tokio::time::Duration::from_millis(1 * (attempt as u64))).await;
     }
 }
 
@@ -93,8 +113,13 @@ struct DocumentInsert {
     documents: Vec<DocumentStruct>,
 }
 
-
-async fn insert_document(cfg: &Cfg, client: &reqwest::Client, session: &str, collection: &str, idx: u16) {
+async fn insert_document(
+    cfg: &Cfg,
+    client: &reqwest::Client,
+    session: &str,
+    collection: &str,
+    idx: u16,
+) {
     let mut docs = DocumentInsert {
         documents: Vec::<DocumentStruct>::new(),
     };
@@ -105,30 +130,54 @@ async fn insert_document(cfg: &Cfg, client: &reqwest::Client, session: &str, col
             address: rand::random::<Address>().to_string(),
             email: rand::random::<Email>().to_string(),
         };
-        println!("WORKER {}: Inserting doc for {} {}", idx, &doc.first_name, &doc.last_name);
+        println!(
+            "WORKER {}: Inserting doc for {} {}",
+            idx, &doc.first_name, &doc.last_name
+        );
         docs.documents.push(doc);
     }
-    let url = format!("http://{}:{}/api/v2/collection/{}/documents", cfg.address, cfg.port, collection);
-    let res = client.post(url)
+    let url = format!(
+        "http://{}:{}/api/v2/collection/{}/documents",
+        cfg.address, cfg.port, collection
+    );
+    let res = client
+        .post(url)
         .header("grpc-metadata-sessionid", session)
         .header("content-type", "application/json")
         .json(&docs)
         .send()
-        .await.expect("Unable to insert document");
+        .await
+        .expect("Unable to insert document");
     if !res.status().is_success() {
-        println!("Error: {}\n{}", res.status().as_u16(), res.text().await.expect("Unable to fetch response body"))
+        println!(
+            "Error: {}\n{}",
+            res.status().as_u16(),
+            res.text().await.expect("Unable to fetch response body")
+        )
     }
 }
 
-async fn insert_n_documents(cfg: &Cfg, client: &reqwest::Client, session: &str, collection: &str, idx: u16) {
+async fn insert_n_documents(
+    cfg: &Cfg,
+    client: &reqwest::Client,
+    session: &str,
+    collection: &str,
+    idx: u16,
+) {
     for _i in 0..cfg.batchnum {
         insert_document(&cfg, &client, &session, &collection, idx).await;
     }
 }
 
-async fn insert_t_documents(cfg: &Cfg, client: &reqwest::Client, session: &str, collection: &str, idx: u16) {
+async fn insert_t_documents(
+    cfg: &Cfg,
+    client: &reqwest::Client,
+    session: &str,
+    collection: &str,
+    idx: u16,
+) {
     let begin = std::time::Instant::now();
-    let end = std::time::Duration::new(cfg.duration.unwrap().into(),0);
+    let end = std::time::Duration::new(cfg.duration.unwrap().into(), 0);
     while begin.elapsed() < end {
         insert_document(&cfg, &client, &session, &collection, idx).await;
     }
@@ -155,13 +204,16 @@ async fn spawner(cfg: &Cfg) {
             tokio::spawn(async move {
                 async_run(&ccfg, &cclient, idx).await;
             })
-        }).buffer_unordered(cfg.workers.into());
-    workers.for_each(|b| async {
-        match b {
-            Ok(_) => println!("Worker done"),
-            Err(e) => println!("Worker error: {}", e),
-        }
-    }).await;
+        })
+        .buffer_unordered(cfg.workers.into());
+    workers
+        .for_each(|b| async {
+            match b {
+                Ok(_) => println!("Worker done"),
+                Err(e) => println!("Worker error: {}", e),
+            }
+        })
+        .await;
 }
 
 #[tokio::main]

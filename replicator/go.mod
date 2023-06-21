@@ -3,7 +3,7 @@ module github.com/codenotary/immudb-tools/replicator
 go 1.18
 
 require (
-	github.com/codenotary/immudb v1.4.0
+	github.com/codenotary/immudb v1.4.1
 	github.com/klauspost/pgzip v1.2.5
 	github.com/pkg/sftp v1.13.1
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e

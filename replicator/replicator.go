@@ -406,6 +406,7 @@ func replicator_loop() {
 }
 
 func main() {
+	// @TODO: Receive configured ImmuDB instances and iterate over them
 	log.Printf("Replicator %s [%s] @ %s", Version, Commit, Buildtime)
 	go rest_interface()
 	replicator_loop()

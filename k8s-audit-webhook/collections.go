@@ -49,6 +49,10 @@ func createCollection() {
 		log.Fatalf("Error marshaling payload: %s", err.Error())
 		return
 	}
+	if config.dump {
+		dump(jsonData)
+	}
+
 	request, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
 	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
 	request.Header.Set("X-API-Key", config.apikey)

@@ -20,6 +20,7 @@ var config struct {
 	ledger     string
 	collection string
 	skipTls    bool
+	dump       bool
 }
 
 type aMsg map[string]any
@@ -58,8 +59,12 @@ func (is *immudbSender) doWrite() {
 	is.payload.Documents = []aMsg{}
 }
 
+var dumpN = 0
+
 func dump(data []byte) {
-	f, _ := os.Create("/tmp/x.log")
+	fname := fmt.Sprintf("dump.%d.json", dumpN)
+	dumpN=dumpN+1
+	f, _ := os.Create(fname)
 	defer f.Close()
 	f.Write(data)
 }
@@ -75,7 +80,9 @@ func (is *immudbSender) doSend() {
 		log.Printf("Error marshaling payload: %s", err.Error())
 		return
 	}
-	dump(jsonData)
+	if config.dump {
+		dump(jsonData)
+	}
 	request, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Printf("Error creating http request: %s", err.Error())
@@ -129,6 +136,7 @@ func init() {
 	flag.StringVar(&config.ledger, "ledger", "default", "Immudb vault ledger")
 	flag.StringVar(&config.collection, "collection", "auditlog", "Immudb vault collection")
 	flag.BoolVar(&config.skipTls, "skiptls", false, "Skip TLS verify")
+	flag.BoolVar(&config.dump, "dump", false, "Dumps json requests")
 	flag.Parse()
 	if config.skipTls {
 		log.Printf("Skip tls")

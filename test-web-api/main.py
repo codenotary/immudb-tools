@@ -1,8 +1,8 @@
 import argparse
 import logging
+import random
 import threading
 import time
-import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
@@ -21,10 +21,14 @@ class Tester:
     def __init__(self):
         self.args = None
         self.time_elapsed = 0
-        self.collection_name = uuid.uuid4().hex
+        self.collection_name = self.rand_name(16)
         self.headers = {'Content-Type': 'application/json', 'grpc-metadata-sessionid': None}
         self.lock = threading.Lock()
         self.transactions = 0
+
+    def rand_name(self, length):
+        letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        return ''.join(random.choice(letters) for i in range(length))
 
     def configure_arguments(self):
         parser = argparse.ArgumentParser(

@@ -38,15 +38,17 @@ type t_tx struct {
 	ic         immudb.ImmuClient
 	txsize     int
 	total      int
+	maxtries   int
 }
 
-func MakeTx(ctx context.Context, client immudb.ImmuClient, name string, txsize int) *t_tx {
+func MakeTx(ctx context.Context, client immudb.ImmuClient, name string, txsize int, maxtries int) *t_tx {
 	return &t_tx{
 		name:   name,
 		tx:     nil,
 		ctx:    ctx,
 		ic:     client,
 		txsize: txsize,
+		maxtries: maxtries,
 		total:  0,
 	}
 }
@@ -56,6 +58,7 @@ func (t *t_tx) Add(stm string) {
 	if len(t.statements) >= t.txsize {
 		t.Commit()
 	}
+	// time.Sleep(10 * time.Millisecond)
 }
 
 func (t *t_tx) Commit() {
@@ -64,7 +67,7 @@ func (t *t_tx) Commit() {
 	}
 	var err error
 	var i int
-	for i = 0; i < 255; i++ {
+	for i = 0; i < t.maxtries; i++ {
 		t.tx, err = t.ic.NewTx(t.ctx)
 		// t.tx, err = t.ic.NewTx(t.ctx, immudb.UnsafeMVCC(), immudb.SnapshotMustIncludeTxID(0), immudb.SnapshotRenewalPeriod(0))
 		if err != nil {

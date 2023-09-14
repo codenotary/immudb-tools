@@ -26,6 +26,8 @@ type cfg struct {
 	Rows       int
 	Duration   int
 	Autoincr   bool
+	SecIndex   bool
+	MaxTries   int
 }
 
 func parseConfig() (c *cfg) {
@@ -38,10 +40,12 @@ func parseConfig() (c *cfg) {
 	flag.IntVar(&c.Workers, "workers", 1, "Number of workers")
 	flag.BoolVar(&c.Debug, "debug", false, "log level: debug")
 	flag.BoolVar(&c.Autoincr, "autoincrement", false, "use AUTOINCREMENT field")
+	flag.BoolVar(&c.SecIndex, "sec-index", false, "add secondary index")
 	flag.IntVar(&c.TxSize, "txsize", 256, "Transaction size")
 	flag.IntVar(&c.InsertSize, "insert-size", 1, "Insert size (values per insert)")
 	flag.IntVar(&c.Rows, "rows", 1000, "Rows to be inserted by a worker")
 	flag.IntVar(&c.Duration, "duration", 0, "Total test duration in seconds(overrides rows)")
+	flag.IntVar(&c.MaxTries, "max-tries", 25, "Max number of attempt to replay a failed transaction")
 	flag.Parse()
 	return
 }
@@ -75,7 +79,7 @@ func connect(config *cfg) (immudb.ImmuClient, context.Context) {
 
 func createTable(c *cfg) {
 	client, ctx := connect(c)
-	tx := MakeTx(ctx, client, "init", 100)
+	tx := MakeTx(ctx, client, "init", 100, c.MaxTries)
 	qb := `CREATE TABLE IF NOT EXISTS logs (
 		id INTEGER %s,
 		ts TIMESTAMP,
@@ -91,6 +95,9 @@ func createTable(c *cfg) {
 	} else {
 		q = fmt.Sprintf(qb, "")
 	}
+	if c.SecIndex {
+		q = q + "CREATE INDEX ON logs(ts); CREATE INDEX ON logs(severity)"
+	}
 	tx.Add(q)
 	tx.Commit()
 	client.CloseSession(ctx)
@@ -99,7 +106,7 @@ func createTable(c *cfg) {
 func worker(c *cfg, wid int) int {
 	debug.Printf("Starting worker %d", wid)
 	client, ctx := connect(c)
-	tx := MakeTx(ctx, client, fmt.Sprintf("W%2.2d", wid), c.TxSize)
+	tx := MakeTx(ctx, client, fmt.Sprintf("W%2.2d", wid), c.TxSize, c.MaxTries)
 	qt0 := `insert into logs(id, ts, address, severity, facility, log) values `
 	qt1 := `insert into logs(ts, address, severity, facility, log) values `
 	v0 := `( %d, NOW(), '%s', %d, %d, '%s')`
